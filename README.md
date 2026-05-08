@@ -166,7 +166,7 @@ The MSRV (**M**inimum **S**upported **R**ust **V**ersion) for the crates in this
 
 ```kotlin
 dependencies {
-    implementation("io.github.kotlinmania:aws-config-kotlin:0.1.0-SNAPSHOT")
+    implementation("io.github.kotlinmania:aws-config-kotlin:0.1.0")
 }
 ```
 
