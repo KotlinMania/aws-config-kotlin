@@ -18,11 +18,12 @@ The discipline:
    know how the file ends. If the file is too long to read in one sitting, split your turn into
    "read the file" and "write the file" — never start typing on a file you've only half-read.
 
-2. **One Rust file → one Kotlin file. Always.** No splitting one `.rs` across several `.kt`. No
-   merging several `.rs` into one `.kt`. The 1:1 mapping is the contract; everything downstream
-   (ast_distance, port-lint headers, code review) assumes it. If a `.rs` is genuinely too big for
-   one Kotlin file, that's a sign you're in `mod.rs`-equivalent territory and the upstream itself
-   is a re-export — verify, don't split.
+2. **One ordinary Rust file -> one Kotlin file.** No merging several `.rs` files into one `.kt`,
+   and no splitting ordinary implementation files. Explicit exception: an upstream `mod.rs` that
+   contains real implementation may be parceled into focused Kotlin files while `Mod.kt` remains
+   the module tracking ledger. Every Kotlin file derived from that `mod.rs` must keep the same
+   required `// port-lint: source <that mod.rs path>` header so ast_distance knows what is tied to
+   what.
 
 3. **Translate top to bottom in upstream order.** Preserve the declaration order. Don't reorder
    for "logical flow" — the upstream's order *is* the logical flow.
@@ -94,6 +95,8 @@ This is how `ast_distance` tracks provenance. Never remove or alter unless the f
 
 If a `mod.rs` contains real implementation that is parceled into more than one Kotlin file, every Kotlin file derived from that upstream file still uses `// port-lint: source <that mod.rs path>`. The header is how `ast_distance` knows what is tied to what. Do not invent unsupported provenance escape hatches: new Kotlin source must either point at its upstream Rust source with a `port-lint: source` header or not be introduced in parity-mode porting work.
 
+This `mod.rs` parceling rule is an approved aws-config-kotlin porting feature, not an ignore mechanism. Use it when the upstream module file has both module ledger material and real code that belongs in separate Kotlin declarations.
+
 ## Build
 
 ```bash
@@ -134,6 +137,11 @@ There is no JVM-only target. `./gradlew jvmTest` is **not** valid.
 - `kotlinx-datetime`
 - `com.ionspin.kotlin:bignum` (only if needed)
 - `io.github.kotlinmania:*-kotlin` siblings (only when porting a transitive Rust dep)
+
+For absolute timestamps on Kotlin 2.3.21, use stable stdlib
+`kotlin.time.Instant` (`Instant.parse`, `Instant.fromEpochSeconds`, epoch
+accessors) without `ExperimentalTime` opt-ins. Reserve `kotlinx-datetime` for
+calendar/time-zone APIs or platform conversions the stdlib does not provide.
 
 Add a new dependency only when the stdlib + the above cannot reproduce the required behavior, and only after confirming it publishes artifacts for **every** target above.
 

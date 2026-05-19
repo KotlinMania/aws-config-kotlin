@@ -46,8 +46,10 @@ in parity/porting mode.
 4. Pick bottom-up work: dependencies before consumers, leaves before roots.
 5. Read the whole upstream `.rs` file before typing. If the file is too large,
    split the turn into "read" and "write"; never start from a half-read file.
-6. Keep the mapping one Rust file -> one Kotlin file unless the upstream file is
-   pure `mod.rs` re-export glue covered by the `mod.rs` rules below.
+6. Keep the mapping one Rust file -> one Kotlin file for ordinary `.rs` files.
+   Explicit exception: an upstream `mod.rs` that contains real implementation
+   may be parceled into focused Kotlin files while `Mod.kt` remains the module
+   tracking ledger.
 7. Translate top-to-bottom in upstream order. Preserve declaration order.
 8. Translate comments and docs as content. See "Source comments and KDoc."
 9. Leave hard files visible; do not fill holes with stubs.
@@ -109,6 +111,10 @@ Kotlin file, every Kotlin file derived from that upstream file still uses
 knows what is tied to what. Do not invent unsupported provenance escape hatches:
 new Kotlin source must either point at its upstream Rust source with a
 `port-lint: source` header or not be introduced in parity-mode porting work.
+
+This `mod.rs` parceling rule is an approved aws-config-kotlin porting feature,
+not an ignore mechanism. Use it when the upstream module file has both module
+ledger material and real code that belongs in separate Kotlin declarations.
 
 ## Naming
 
@@ -301,6 +307,11 @@ Approved common dependencies, when the repo already uses or needs them:
 - `kotlinx-io`
 - `com.ionspin.kotlin:bignum` only when numeric behavior requires it
 - `io.github.kotlinmania:*-kotlin` sibling ports for Rust transitive deps
+
+For absolute timestamps on Kotlin 2.3.21, prefer stable stdlib
+`kotlin.time.Instant` (`Instant.parse`, `Instant.fromEpochSeconds`, epoch
+accessors) without `ExperimentalTime` opt-ins. Add `kotlinx-datetime` only for
+calendar/time-zone APIs or platform conversions the stdlib does not provide.
 
 Add a dependency only when stdlib plus approved siblings cannot reproduce the
 behavior, and only after confirming it publishes artifacts for every target this
