@@ -19,37 +19,19 @@ internal sealed class InvalidJsonCredentials(
     cause: Throwable? = null,
 ) : Exception(message, cause) {
     /** The response did not contain valid JSON. */
-    internal class JsonError(internal val error: Throwable) :
+    internal class JsonError(error: Throwable) :
         InvalidJsonCredentials("invalid JSON in response: ${error.message ?: error}", error)
 
     /** The response was missing a required field. */
-    internal class MissingField(internal val field: String) :
+    internal class MissingField(private val field: String) :
         InvalidJsonCredentials("Expected field `$field` in response but it was missing")
 
     /** A field was invalid. */
-    internal class InvalidField(
-        internal val field: String,
-        internal val error: Throwable,
-    ) :
+    internal class InvalidField(field: String, error: Throwable) :
         InvalidJsonCredentials("Invalid field in response: `$field`. ${error.message ?: error}", error)
 
     /** Another unhandled error occurred. */
-    internal class Other(internal val msg: String) : InvalidJsonCredentials(msg)
-
-    internal fun fmt(): String = when (this) {
-        is JsonError -> "invalid JSON in response: ${error.message ?: error}"
-        is MissingField -> "Expected field `$field` in response but it was missing"
-        is Other -> msg
-        is InvalidField -> "Invalid field in response: `$field`. ${error.message ?: error}"
-    }
-
-    override fun toString(): String = fmt()
-
-    internal companion object {
-        internal fun from(error: SerializationException): InvalidJsonCredentials = JsonError(error)
-
-        internal fun from(error: IllegalArgumentException): InvalidJsonCredentials = JsonError(error)
-    }
+    internal class Other(message: String) : InvalidJsonCredentials(message)
 }
 
 internal data class RefreshableCredentials(
@@ -59,14 +41,12 @@ internal data class RefreshableCredentials(
     val accountId: String?,
     val expiration: Instant,
 ) {
-    internal fun fmt(): String =
+    override fun toString(): String =
         "RefreshableCredentials(accessKeyId=$accessKeyId, " +
             "secretAccessKey=** redacted **, " +
             "sessionToken=** redacted **" +
             accountId?.let { ", accountId=$it" }.orEmpty() +
             ", expiration=$expiration)"
-
-    override fun toString(): String = fmt()
 }
 
 internal sealed class JsonCredentials {
@@ -90,7 +70,37 @@ internal sealed class JsonCredentials {
  *
  * Keys are case insensitive.
  */
-internal fun parseJsonCredentials(credentialsResponse: String): Result<JsonCredentials> {
+internal fun parseJsonCredentials(credentialsResponse: String): Result<JsonCredentials> =
+    jsonParseLoop(credentialsResponse) { _, _ -> Result.success(Unit) }.fold(
+        onSuccess = {
+            val root = parseJsonObject(credentialsResponse).getOrElse {
+                return Result.failure(it)
+            }
+            try {
+                Result.success(parseJsonCredentialsObject(root))
+            } catch (error: InvalidJsonCredentials) {
+                Result.failure(error)
+            }
+        },
+        onFailure = { Result.failure(it) },
+    )
+
+internal fun jsonParseLoop(
+    input: String,
+    f: (String, JsonElement) -> Result<Unit>,
+): Result<Unit> {
+    val root = parseJsonObject(input).getOrElse {
+        return Result.failure(it)
+    }
+    for ((key, value) in root) {
+        f(key, value).getOrElse {
+            return Result.failure(it)
+        }
+    }
+    return Result.success(Unit)
+}
+
+private fun parseJsonCredentialsObject(root: JsonObject): JsonCredentials {
     var code: String? = null
     var accessKeyId: String? = null
     var secretAccessKey: String? = null
@@ -99,7 +109,7 @@ internal fun parseJsonCredentials(credentialsResponse: String): Result<JsonCrede
     var expiration: String? = null
     var message: String? = null
 
-    jsonParseLoop(credentialsResponse) { key, value ->
+    jsonParseLoop(root) { key, value ->
         val stringValue = value.stringContentOrNull()
         when {
             key.equals("Code", ignoreCase = true) && stringValue != null -> {
@@ -133,58 +143,47 @@ internal fun parseJsonCredentials(credentialsResponse: String): Result<JsonCrede
             }
         }
         Result.success(Unit)
-    }.getOrElse {
-        return Result.failure(it)
-    }
+    }.getOrThrow()
 
-    return try {
-        Result.success(
-            when (val codeValue = code) {
-                // IMDS does not appear to reply with a `Code` missing, but documentation indicates it
-                // may be possible.
-                null, "Success" -> {
-                    val parsedAccessKeyId =
-                        accessKeyId ?: throw InvalidJsonCredentials.MissingField("AccessKeyId")
-                    val parsedSecretAccessKey =
-                        secretAccessKey ?: throw InvalidJsonCredentials.MissingField("SecretAccessKey")
-                    val parsedSessionToken =
-                        sessionToken ?: throw InvalidJsonCredentials.MissingField("Token")
-                    val parsedExpiration =
-                        expiration ?: throw InvalidJsonCredentials.MissingField("Expiration")
-                    val expirationInstant = try {
-                        Instant.parse(parsedExpiration)
-                    } catch (error: IllegalArgumentException) {
-                        throw InvalidJsonCredentials.InvalidField("Expiration", error)
-                    }
+    return when (val codeValue = code) {
+        // IMDS does not appear to reply with a `Code` missing, but documentation indicates it
+        // may be possible.
+        null, "Success" -> {
+            val parsedAccessKeyId =
+                accessKeyId ?: throw InvalidJsonCredentials.MissingField("AccessKeyId")
+            val parsedSecretAccessKey =
+                secretAccessKey ?: throw InvalidJsonCredentials.MissingField("SecretAccessKey")
+            val parsedSessionToken =
+                sessionToken ?: throw InvalidJsonCredentials.MissingField("Token")
+            val parsedExpiration =
+                expiration ?: throw InvalidJsonCredentials.MissingField("Expiration")
+            val expirationInstant = try {
+                Instant.parse(parsedExpiration)
+            } catch (error: IllegalArgumentException) {
+                throw InvalidJsonCredentials.InvalidField("Expiration", error)
+            }
 
-                    JsonCredentials.RefreshableCredentials(
-                        RefreshableCredentials(
-                            accessKeyId = parsedAccessKeyId,
-                            secretAccessKey = parsedSecretAccessKey,
-                            sessionToken = parsedSessionToken,
-                            accountId = accountId,
-                            expiration = expirationInstant,
-                        ),
-                    )
-                }
-                else -> JsonCredentials.Error(
-                    code = codeValue,
-                    message = message ?: "no message",
+            JsonCredentials.RefreshableCredentials(
+                RefreshableCredentials(
+                    accessKeyId = parsedAccessKeyId,
+                    secretAccessKey = parsedSecretAccessKey,
+                    sessionToken = parsedSessionToken,
+                    accountId = accountId,
+                    expiration = expirationInstant,
                 )
-            },
+            )
+        }
+        else -> JsonCredentials.Error(
+            code = codeValue,
+            message = message ?: "no message",
         )
-    } catch (error: InvalidJsonCredentials) {
-        Result.failure(error)
     }
 }
 
-internal fun jsonParseLoop(
-    input: String,
+private fun jsonParseLoop(
+    root: JsonObject,
     f: (String, JsonElement) -> Result<Unit>,
 ): Result<Unit> {
-    val root = parseJsonObject(input).getOrElse {
-        return Result.failure(it)
-    }
     for ((key, value) in root) {
         f(key, value).getOrElse {
             return Result.failure(it)
@@ -197,9 +196,9 @@ private fun parseJsonObject(input: String): Result<JsonObject> {
     val element = try {
         Json.parseToJsonElement(input)
     } catch (error: SerializationException) {
-        return Result.failure(InvalidJsonCredentials.from(error))
+        return Result.failure(InvalidJsonCredentials.JsonError(error))
     } catch (error: IllegalArgumentException) {
-        return Result.failure(InvalidJsonCredentials.from(error))
+        return Result.failure(InvalidJsonCredentials.JsonError(error))
     }
 
     return try {

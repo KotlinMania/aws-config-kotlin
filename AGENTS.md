@@ -34,6 +34,10 @@ in parity/porting mode.
   instead of continuing blind.
 - Do not chase similarity scores in the middle of translating a half-read file,
   and never Rustify Kotlin to appease the tool.
+- Do not inline, extract, rename, or add Rust-only helper methods solely because
+  a targeted function comparison score is low. Low similarity is a diagnostic
+  to inspect for missing behavior, not permission to reshape behaviorally sound
+  Kotlin into Rust-shaped Kotlin.
 
 ## Required workflow in parity mode
 

@@ -30,22 +30,6 @@ internal sealed class RetryConfigErrorKind {
 class RetryConfigError internal constructor(
     internal val kind: RetryConfigErrorKind,
 ) : Exception(messageFor(kind), sourceFor(kind)) {
-    internal fun fmt(): String = when (kind) {
-        is RetryConfigErrorKind.InvalidRetryMode -> "invalid retry configuration"
-        RetryConfigErrorKind.MaxAttemptsMustNotBeZero ->
-            "invalid configuration: It is invalid to set max attempts to 0. " +
-                "Unset it or set it to an integer greater than or equal to one."
-        is RetryConfigErrorKind.FailedToParseMaxAttempts -> "failed to parse max attempts"
-    }
-
-    internal fun source(): Throwable? = when (kind) {
-        is RetryConfigErrorKind.InvalidRetryMode -> kind.source
-        is RetryConfigErrorKind.FailedToParseMaxAttempts -> kind.source
-        RetryConfigErrorKind.MaxAttemptsMustNotBeZero -> null
-    }
-
-    override fun toString(): String = fmt()
-
     companion object {
         internal fun from(kind: RetryConfigErrorKind): RetryConfigError = RetryConfigError(kind)
 

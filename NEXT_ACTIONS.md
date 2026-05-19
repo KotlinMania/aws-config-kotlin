@@ -5,13 +5,13 @@ Based on AST analysis, here are the concrete next steps.
 ## Summary
 
 - **Files Present:** 7/62 (11.3%)
-- **Function parity:** 23/667 matched (target 45) — 3.4%
+- **Function parity:** 18/667 matched (target 38) — 2.7%
 - **Class/type parity:** 9/159 matched (target 31) — 5.7%
-- **Combined symbol parity:** 32/826 matched (target 76) — 3.9%
-- **Average inline-code cosine:** 0.39 (function body across 5 matched files)
+- **Combined symbol parity:** 27/826 matched (target 69) — 3.3%
+- **Average inline-code cosine:** 0.28 (function body across 5 matched files)
 - **Average documentation cosine:** 0.38 (doc text across 5 matched files)
 - **Cheat-zeroed Files:** 2
-- **Critical Issues:** 6 files with <0.60 function similarity
+- **Critical Issues:** 7 files with <0.60 function similarity
 
 ## Priority 1: Fix Incomplete High-Dependency Files
 
@@ -40,11 +40,11 @@ Every matched file is listed below with function and type symbol parity.
 ### 1. profile
 
 - **Target:** `profile.Profile`
-- **Similarity:** 0.21
+- **Similarity:** 0.14
 - **Dependents:** 2
-- **Priority Score:** 2020607.9
-- **Functions:** 2/4 matched (target 2)
-- **Missing functions:** `taken_error`, `value_initialized_once`
+- **Priority Score:** 2030608.6
+- **Functions:** 1/4 matched (target 1)
+- **Missing functions:** `new`, `taken_error`, `value_initialized_once`
 - **Types:** 2/2 matched (target 7)
 - **Missing types:** _none_
 - **Tests:** 0/2 matched
@@ -72,7 +72,30 @@ Every matched file is listed below with function and type symbol parity.
 - **Types:** 0/3 matched (target 0)
 - **Missing types:** `InvalidBooleanValue`, `InvalidUintValue`, `InvalidUrlValue`
 
-### 4. sensitive_command
+### 4. json_credentials
+
+- **Target:** `awsconfig.JsonCredentials`
+- **Similarity:** 0.42
+- **Dependents:** 0
+- **Priority Score:** 21605.8
+- **Functions:** 11/13 matched (target 16)
+- **Missing functions:** `from`, `fmt`
+- **Types:** 3/3 matched (target 9)
+- **Missing types:** _none_
+- **Tests:** 9/9 matched
+
+### 5. retry
+
+- **Target:** `retry.Retry`
+- **Similarity:** 0.29
+- **Dependents:** 0
+- **Priority Score:** 20507.1
+- **Functions:** 1/3 matched
+- **Missing functions:** `fmt`, `source`
+- **Types:** 2/2 matched (target 5)
+- **Missing types:** _none_
+
+### 6. sensitive_command
 
 - **Target:** `awsconfig.SensitiveCommand`
 - **Similarity:** 0.37
@@ -81,29 +104,6 @@ Every matched file is listed below with function and type symbol parity.
 - **Functions:** 3/4 matched
 - **Missing functions:** `fmt`
 - **Types:** 1/1 matched
-- **Missing types:** _none_
-
-### 5. json_credentials
-
-- **Target:** `awsconfig.JsonCredentials`
-- **Similarity:** 0.56
-- **Dependents:** 0
-- **Priority Score:** 1604.4
-- **Functions:** 13/13 matched (target 19)
-- **Missing functions:** _none_
-- **Types:** 3/3 matched (target 9)
-- **Missing types:** _none_
-- **Tests:** 9/9 matched
-
-### 6. retry
-
-- **Target:** `retry.Retry`
-- **Similarity:** 0.66
-- **Dependents:** 0
-- **Priority Score:** 503.4
-- **Functions:** 3/3 matched (target 6)
-- **Missing functions:** _none_
-- **Types:** 2/2 matched (target 5)
 - **Missing types:** _none_
 
 ### 7. imds.mod

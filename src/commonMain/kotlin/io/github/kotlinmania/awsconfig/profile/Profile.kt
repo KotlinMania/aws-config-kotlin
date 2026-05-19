@@ -23,10 +23,6 @@ internal class ErrorTakingOnceCell<T, E> {
     private val mutex = Mutex()
     private var cell: Cell<T, E>? = null
 
-    internal companion object {
-        internal fun <T, E> new(): ErrorTakingOnceCell<T, E> = ErrorTakingOnceCell()
-    }
-
     internal suspend fun getOrInit(
         init: suspend () -> ErrorTakingResult<T, E>,
         takenError: E,

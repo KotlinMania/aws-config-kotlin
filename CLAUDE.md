@@ -41,6 +41,8 @@ The discipline:
 
 6. **Don't measure mid-port.** ast_distance, FnSim, similarity reports — useful *after* a file is
    done, useless *during*.
+   A low targeted compare is a diagnostic, not a rewrite order: do not inline, extract, rename,
+   or add Rust-only helper methods solely to move the score.
 
 7. **Don't optimize the translation.** "This Kotlin shape would be simpler" is the wrong thought.
    The upstream shape is the spec.
