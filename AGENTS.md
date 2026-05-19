@@ -4,7 +4,7 @@ This file is the quick-reference operating contract for aws-config-kotlin. The l
 project story lives in `CLAUDE.md`, `README.md`, and any repo-local notes. Read
 those before editing. This guide captures the workspace-wide porting discipline
 that must not drift: Kotlin stays Kotlin, source comments stay Kotlin-facing,
-and required port inventory is done with `ast_distance` when the repo ships it.
+and required port inventory is done with `ast_distance`.
 
 ## What this repo is
 
@@ -19,20 +19,21 @@ Kotlin library when a `*-kotlin` sibling port exists or should exist.
 
 ## Project phase
 
-Check the repo before choosing a workflow.
+Check the repo before choosing a workflow. `aws-config-kotlin` has
+`.ast_distance_config.json` and upstream Rust under `tmp/aws-config`, so it is
+in parity/porting mode.
 
-- **If `tools/ast_distance/` exists:** the repo is still in parity/porting
-  mode. Drift measurement is required, not optional. Use the repo's
-  `tools/ast_distance` binary/script to identify missing files, missing
-  functions, provenance/header drift, and cheat-detection failures before
-  choosing work and again at file or phase boundaries. Do not chase similarity
-  scores in the middle of translating a half-read file, and never Rustify
-  Kotlin to appease the tool.
-- **If `tools/ast_distance/` does not exist:** the repo has matured past the
-  structural-port phase and is optimizing for idiomatic Kotlin. Work like a
-  Kotlin maintainer: preserve behavior and public API intent, improve Kotlin
-  shape when appropriate, and use the repo's tests/docs as the gate. Do not
-  reintroduce Rust-shaped code or comments.
+- `ast_distance` is required, not optional. Use it to identify missing files,
+  missing functions, provenance/header drift, and cheat-detection failures
+  before choosing work and again at file or phase boundaries.
+- Prefer a repo-local `tools/ast_distance` binary/script when present. If this
+  repo does not ship one, use an approved workspace/shared `ast_distance`
+  binary with the paths from `.ast_distance_config.json`. A missing repo-local
+  binary is not permission to skip measurement.
+- If no runnable `ast_distance` is available, stop and report that as a blocker
+  instead of continuing blind.
+- Do not chase similarity scores in the middle of translating a half-read file,
+  and never Rustify Kotlin to appease the tool.
 
 ## Required workflow in parity mode
 
@@ -40,9 +41,8 @@ Check the repo before choosing a workflow.
 2. Confirm the upstream Rust source is present under the `tmp/` path named by
    `CLAUDE.md` or `.ast_distance_config.json`. Fetch it using the repo's helper
    if needed. Never edit it.
-3. If `tools/ast_distance/` exists, run the repo's `ast_distance --deep`
-   workflow before picking work. Use it as the required inventory for unported
-   files/functions and provenance drift.
+3. Run `ast_distance --deep` before picking work. Use it as the required
+   inventory for unported files/functions and provenance drift.
 4. Pick bottom-up work: dependencies before consumers, leaves before roots.
 5. Read the whole upstream `.rs` file before typing. If the file is too large,
    split the turn into "read" and "write"; never start from a half-read file.
@@ -51,8 +51,8 @@ Check the repo before choosing a workflow.
 7. Translate top-to-bottom in upstream order. Preserve declaration order.
 8. Translate comments and docs as content. See "Source comments and KDoc."
 9. Leave hard files visible; do not fill holes with stubs.
-10. After a file lands, run the relevant compile/test gate and, when available,
-    `ast_distance` again.
+10. After a file lands, run the relevant compile/test gate and `ast_distance`
+    again.
 
 ## Required workflow in mature Kotlin mode
 
@@ -103,9 +103,12 @@ Use the path convention from `CLAUDE.md` or `.ast_distance_config.json`. Do not
 invent absolute upstream paths. If a repo requires an attribution line after the
 `port-lint` header, preserve it exactly.
 
-For files with no single Rust counterpart, use `// port-lint: ignore` only when
-repo docs allow it, and add the shortest possible upstream-derived or ledger
-note. Do not use ignored files as a place for translation rationale.
+If a `mod.rs` contains real implementation that is parceled into more than one
+Kotlin file, every Kotlin file derived from that upstream file still uses
+`// port-lint: source <that mod.rs path>`. The header is how `ast_distance`
+knows what is tied to what. Do not invent unsupported provenance escape hatches:
+new Kotlin source must either point at its upstream Rust source with a
+`port-lint: source` header or not be introduced in parity-mode porting work.
 
 ## Naming
 

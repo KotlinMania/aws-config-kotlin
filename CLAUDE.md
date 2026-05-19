@@ -67,6 +67,13 @@ The discipline:
     because you left snake_case identifiers or `pub` keywords in Kotlin comments, take it as a
     literal instruction: rewrite those comments to be Kotlin-native.
 
+16. **ast_distance is required.** This repo has `.ast_distance_config.json` and upstream Rust under
+    `tmp/aws-config`, so parity measurement is mandatory. Run `ast_distance --deep` before choosing
+    work and after completed file or phase boundaries. Prefer a repo-local `tools/ast_distance`
+    binary when present; otherwise use an approved workspace/shared `ast_distance` binary with the
+    paths from `.ast_distance_config.json`. If no runnable binary is available, stop and report the
+    blocker instead of continuing without measurement.
+
 ## Port-lint headers (REQUIRED)
 
 Every Kotlin file MUST start with:
@@ -85,7 +92,7 @@ package io.github.kotlinmania.awsconfig
 
 This is how `ast_distance` tracks provenance. Never remove or alter unless the file is being re-targeted to a different Rust source.
 
-For files that have no single Rust counterpart (re-homed from a `mod.rs`, or pure Kotlin glue), use `// port-lint: ignore` and a one-line prose note explaining what it does.
+If a `mod.rs` contains real implementation that is parceled into more than one Kotlin file, every Kotlin file derived from that upstream file still uses `// port-lint: source <that mod.rs path>`. The header is how `ast_distance` knows what is tied to what. Do not invent unsupported provenance escape hatches: new Kotlin source must either point at its upstream Rust source with a `port-lint: source` header or not be introduced in parity-mode porting work.
 
 ## Build
 
