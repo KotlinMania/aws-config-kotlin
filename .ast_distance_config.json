@@ -1,6 +1,5 @@
 {
   "type": "maintenance",
-  "parity_mode": false,
   "name": "aws-config-kotlin",
   "source": {
     "path": "tmp/aws-config/src",
