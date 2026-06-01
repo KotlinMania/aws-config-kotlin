@@ -25,7 +25,8 @@ internal class InvalidUintValue(
 }
 
 internal fun parseUint(value: String): Result<UInt> =
-    value.toUIntOrNull()
+    value
+        .toUIntOrNull()
         ?.let { Result.success(it) }
         ?: Result.failure(InvalidUintValue(value))
 
@@ -44,8 +45,9 @@ internal fun parseUrl(value: String): Result<String> {
     }
 
     val scheme = value.substring(0, schemeEnd)
-    val hasValidScheme = scheme.first().isLetter() &&
-        scheme.all { it.isLetterOrDigit() || it == '+' || it == '-' || it == '.' }
+    val hasValidScheme =
+        scheme.first().isLetter() &&
+            scheme.all { it.isLetterOrDigit() || it == '+' || it == '-' || it == '.' }
     if (!hasValidScheme) {
         return Result.failure(InvalidUrlValue(value))
     }

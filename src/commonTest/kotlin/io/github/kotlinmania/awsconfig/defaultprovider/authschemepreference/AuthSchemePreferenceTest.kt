@@ -18,10 +18,11 @@ class AuthSchemePreferenceTest {
 
     @Test
     fun parsesFullyQualifiedAndTrimmedNames() {
-        val parsed = parseAuthSchemeNames(
-            "aws.auth#sigv4, smithy.api#httpBasicAuth, smithy.api#httpDigestAuth, " +
-                "\thttpBearerAuth \t, httpApiKeyAuth ",
-        ).getOrThrow()
+        val parsed =
+            parseAuthSchemeNames(
+                "aws.auth#sigv4, smithy.api#httpBasicAuth, smithy.api#httpDigestAuth, " +
+                    "\thttpBearerAuth \t, httpApiKeyAuth ",
+            ).getOrThrow()
         assertEquals(
             listOf("sigv4", "httpBasicAuth", "httpDigestAuth", "httpBearerAuth", "httpApiKeyAuth"),
             parsed.schemes.map { it.value },

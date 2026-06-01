@@ -9,8 +9,7 @@ package io.github.kotlinmania.awsconfig
 internal class CommandWithSensitiveArgs<T : CharSequence> private constructor(
     private val value: T,
 ) {
-    internal fun toOwnedString(): CommandWithSensitiveArgs<String> =
-        CommandWithSensitiveArgs(value.toString())
+    internal fun toOwnedString(): CommandWithSensitiveArgs<String> = CommandWithSensitiveArgs(value.toString())
 
     internal fun unredacted(): String = value.toString()
 
@@ -26,7 +25,6 @@ internal class CommandWithSensitiveArgs<T : CharSequence> private constructor(
     }
 
     internal companion object {
-        internal fun <T : CharSequence> new(value: T): CommandWithSensitiveArgs<T> =
-            CommandWithSensitiveArgs(value)
+        internal fun <T : CharSequence> new(value: T): CommandWithSensitiveArgs<T> = CommandWithSensitiveArgs(value)
     }
 }

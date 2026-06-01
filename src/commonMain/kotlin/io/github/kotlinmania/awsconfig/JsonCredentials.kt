@@ -19,19 +19,25 @@ internal sealed class InvalidJsonCredentials(
     cause: Throwable? = null,
 ) : Exception(message, cause) {
     /** The response did not contain valid JSON. */
-    internal class JsonError(error: Throwable) :
-        InvalidJsonCredentials("invalid JSON in response: ${error.message ?: error}", error)
+    internal class JsonError(
+        error: Throwable,
+    ) : InvalidJsonCredentials("invalid JSON in response: ${error.message ?: error}", error)
 
     /** The response was missing a required field. */
-    internal class MissingField(private val field: String) :
-        InvalidJsonCredentials("Expected field `$field` in response but it was missing")
+    internal class MissingField(
+        private val field: String,
+    ) : InvalidJsonCredentials("Expected field `$field` in response but it was missing")
 
     /** A field was invalid. */
-    internal class InvalidField(field: String, error: Throwable) :
-        InvalidJsonCredentials("Invalid field in response: `$field`. ${error.message ?: error}", error)
+    internal class InvalidField(
+        field: String,
+        error: Throwable,
+    ) : InvalidJsonCredentials("Invalid field in response: `$field`. ${error.message ?: error}", error)
 
     /** Another unhandled error occurred. */
-    internal class Other(message: String) : InvalidJsonCredentials(message)
+    internal class Other(
+        message: String,
+    ) : InvalidJsonCredentials(message)
 }
 
 internal data class RefreshableCredentials(
@@ -73,9 +79,10 @@ internal sealed class JsonCredentials {
 internal fun parseJsonCredentials(credentialsResponse: String): Result<JsonCredentials> =
     jsonParseLoop(credentialsResponse) { _, _ -> Result.success(Unit) }.fold(
         onSuccess = {
-            val root = parseJsonObject(credentialsResponse).getOrElse {
-                return Result.failure(it)
-            }
+            val root =
+                parseJsonObject(credentialsResponse).getOrElse {
+                    return Result.failure(it)
+                }
             try {
                 Result.success(parseJsonCredentialsObject(root))
             } catch (error: InvalidJsonCredentials) {
@@ -89,9 +96,10 @@ internal fun jsonParseLoop(
     input: String,
     f: (String, JsonElement) -> Result<Unit>,
 ): Result<Unit> {
-    val root = parseJsonObject(input).getOrElse {
-        return Result.failure(it)
-    }
+    val root =
+        parseJsonObject(input).getOrElse {
+            return Result.failure(it)
+        }
     for ((key, value) in root) {
         f(key, value).getOrElse {
             return Result.failure(it)
@@ -124,7 +132,8 @@ private fun parseJsonCredentialsObject(root: JsonObject): JsonCredentials {
             (
                 key.equals("Token", ignoreCase = true) ||
                     key.equals("SessionToken", ignoreCase = true)
-                ) && stringValue != null -> {
+            ) &&
+                stringValue != null -> {
                 sessionToken = stringValue
             }
             key.equals("AccountId", ignoreCase = true) && stringValue != null -> {
@@ -133,7 +142,8 @@ private fun parseJsonCredentialsObject(root: JsonObject): JsonCredentials {
             (
                 key.equals("Expiration", ignoreCase = true) ||
                     key.equals("ExpiresAt", ignoreCase = true)
-                ) && stringValue != null -> {
+            ) &&
+                stringValue != null -> {
                 expiration = stringValue
             }
 
@@ -157,11 +167,12 @@ private fun parseJsonCredentialsObject(root: JsonObject): JsonCredentials {
                 sessionToken ?: throw InvalidJsonCredentials.MissingField("Token")
             val parsedExpiration =
                 expiration ?: throw InvalidJsonCredentials.MissingField("Expiration")
-            val expirationInstant = try {
-                Instant.parse(parsedExpiration)
-            } catch (error: IllegalArgumentException) {
-                throw InvalidJsonCredentials.InvalidField("Expiration", error)
-            }
+            val expirationInstant =
+                try {
+                    Instant.parse(parsedExpiration)
+                } catch (error: IllegalArgumentException) {
+                    throw InvalidJsonCredentials.InvalidField("Expiration", error)
+                }
 
             JsonCredentials.RefreshableCredentials(
                 RefreshableCredentials(
@@ -170,13 +181,14 @@ private fun parseJsonCredentialsObject(root: JsonObject): JsonCredentials {
                     sessionToken = parsedSessionToken,
                     accountId = accountId,
                     expiration = expirationInstant,
-                )
+                ),
             )
         }
-        else -> JsonCredentials.Error(
-            code = codeValue,
-            message = message ?: "no message",
-        )
+        else ->
+            JsonCredentials.Error(
+                code = codeValue,
+                message = message ?: "no message",
+            )
     }
 }
 
@@ -193,13 +205,14 @@ private fun jsonParseLoop(
 }
 
 private fun parseJsonObject(input: String): Result<JsonObject> {
-    val element = try {
-        Json.parseToJsonElement(input)
-    } catch (error: SerializationException) {
-        return Result.failure(InvalidJsonCredentials.JsonError(error))
-    } catch (error: IllegalArgumentException) {
-        return Result.failure(InvalidJsonCredentials.JsonError(error))
-    }
+    val element =
+        try {
+            Json.parseToJsonElement(input)
+        } catch (error: SerializationException) {
+            return Result.failure(InvalidJsonCredentials.JsonError(error))
+        } catch (error: IllegalArgumentException) {
+            return Result.failure(InvalidJsonCredentials.JsonError(error))
+        }
 
     return try {
         Result.success(element.jsonObject)
@@ -212,5 +225,4 @@ private fun parseJsonObject(input: String): Result<JsonObject> {
     }
 }
 
-private fun JsonElement.stringContentOrNull(): String? =
-    (this as? JsonPrimitive)?.takeIf { it.isString }?.content
+private fun JsonElement.stringContentOrNull(): String? = (this as? JsonPrimitive)?.takeIf { it.isString }?.content
