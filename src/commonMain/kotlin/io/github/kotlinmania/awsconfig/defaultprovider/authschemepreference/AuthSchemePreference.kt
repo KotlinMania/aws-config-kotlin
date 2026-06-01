@@ -26,8 +26,7 @@ internal data class AuthSchemePreference(
     val schemes: List<AuthSchemeId>,
 ) {
     internal companion object {
-        internal fun from(schemes: Iterable<AuthSchemeId>): AuthSchemePreference =
-            AuthSchemePreference(schemes.toList())
+        internal fun from(schemes: Iterable<AuthSchemeId>): AuthSchemePreference = AuthSchemePreference(schemes.toList())
     }
 }
 

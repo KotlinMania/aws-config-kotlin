@@ -15,8 +15,13 @@ import kotlinx.coroutines.sync.withLock
 // see the `load` function.
 
 internal sealed class ErrorTakingResult<out T, out E> {
-    internal data class Ok<T>(val value: T) : ErrorTakingResult<T, Nothing>()
-    internal data class Err<E>(val error: E) : ErrorTakingResult<Nothing, E>()
+    internal data class Ok<T>(
+        val value: T,
+    ) : ErrorTakingResult<T, Nothing>()
+
+    internal data class Err<E>(
+        val error: E,
+    ) : ErrorTakingResult<Nothing, E>()
 }
 
 internal class ErrorTakingOnceCell<T, E> {
@@ -26,29 +31,36 @@ internal class ErrorTakingOnceCell<T, E> {
     internal suspend fun getOrInit(
         init: suspend () -> ErrorTakingResult<T, E>,
         takenError: E,
-    ): ErrorTakingResult<T, E> = mutex.withLock {
-        when (val current = cell) {
-            is Cell.Value -> ErrorTakingResult.Ok(current.value)
-            is Cell.Error -> {
-                val error = current.error
-                current.error = takenError
-                ErrorTakingResult.Err(error)
-            }
-            null -> when (val initialized = init()) {
-                is ErrorTakingResult.Ok -> {
-                    cell = Cell.Value(initialized.value)
-                    ErrorTakingResult.Ok(initialized.value)
+    ): ErrorTakingResult<T, E> =
+        mutex.withLock {
+            when (val current = cell) {
+                is Cell.Value -> ErrorTakingResult.Ok(current.value)
+                is Cell.Error -> {
+                    val error = current.error
+                    current.error = takenError
+                    ErrorTakingResult.Err(error)
                 }
-                is ErrorTakingResult.Err -> {
-                    cell = Cell.Error(initialized.error)
-                    ErrorTakingResult.Err(initialized.error)
-                }
+                null ->
+                    when (val initialized = init()) {
+                        is ErrorTakingResult.Ok -> {
+                            cell = Cell.Value(initialized.value)
+                            ErrorTakingResult.Ok(initialized.value)
+                        }
+                        is ErrorTakingResult.Err -> {
+                            cell = Cell.Error(initialized.error)
+                            ErrorTakingResult.Err(initialized.error)
+                        }
+                    }
             }
         }
-    }
 
     private sealed class Cell<T, E> {
-        data class Value<T, E>(val value: T) : Cell<T, E>()
-        data class Error<T, E>(var error: E) : Cell<T, E>()
+        data class Value<T, E>(
+            val value: T,
+        ) : Cell<T, E>()
+
+        data class Error<T, E>(
+            var error: E,
+        ) : Cell<T, E>()
     }
 }
