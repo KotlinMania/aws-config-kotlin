@@ -6,8 +6,8 @@ Based on AST analysis, here are the concrete next steps.
 
 - **Files Present:** 7/62 (11.3%)
 - **Function parity:** 18/667 matched (target 38) — 2.7%
-- **Class/type parity:** 9/159 matched (target 31) — 5.7%
-- **Combined symbol parity:** 27/826 matched (target 69) — 3.3%
+- **Class/type parity:** 9/159 matched (target 32) — 5.7%
+- **Combined symbol parity:** 27/826 matched (target 70) — 3.3%
 - **Average inline-code cosine:** 0.28 (function body across 5 matched files)
 - **Average documentation cosine:** 0.38 (doc text across 5 matched files)
 - **Cheat-zeroed Files:** 2
@@ -69,7 +69,7 @@ Every matched file is listed below with function and type symbol parity.
 - **Priority Score:** 70710.0
 - **Functions:** 0/4 matched (target 0)
 - **Missing functions:** `fmt`, `parse_bool`, `parse_uint`, `parse_url`
-- **Types:** 0/3 matched (target 0)
+- **Types:** 0/3 matched (target 1)
 - **Missing types:** `InvalidBooleanValue`, `InvalidUintValue`, `InvalidUrlValue`
 
 ### 4. json_credentials
@@ -97,7 +97,7 @@ Every matched file is listed below with function and type symbol parity.
 
 ### 6. sensitive_command
 
-- **Target:** `awsconfig.SensitiveCommand`
+- **Target:** `awsconfig.CommandWithSensitiveArgs`
 - **Similarity:** 0.37
 - **Dependents:** 0
 - **Priority Score:** 10506.3
@@ -129,16 +129,6 @@ For each file to be considered "complete":
 - Documentation ported
 - port-lint header present
 
-## Next Commands
-
-```bash
-# Initialize task queue for systematic porting
-cd tools/ast_distance
-./ast_distance --init-tasks ../../tmp/aws-config/src rust ../../src/commonMain/kotlin/io/github/kotlinmania/awsconfig kotlin tasks.json ../../AGENTS.md
-
-# Get next high-priority task
-./ast_distance --assign tasks.json <agent-id>
-```
 ## Reexport / Wiring Modules
 
 These files match `reexport_modules` patterns in `.ast_distance_config.json`. They are filtered out of
