@@ -111,6 +111,9 @@ configurations.configureEach {
             ),
         )
     }
+    if (name.contains("androidDeviceTest", ignoreCase = true)) {
+        exclude(group = "org.jetbrains", module = "annotations")
+    }
 }
 
 // Opt-ins shared across Kotlin targets.
@@ -888,6 +891,13 @@ val publishToCentralPortal by tasks.registering {
 // Exact test lifecycle task. Without this, ./gradlew test is ambiguous between
 // Android test task names. This runs commonTest through the KMP allTests
 // lifecycle and adds the Android host + Swift Export parity tests.
+tasks.register("test") {
+    group = "verification"
+    description = "Runs the commonTest-backed KMP suite, Android host tests, and Swift Export smoke test."
+    dependsOn("hostTests")
+    dependsOn("swiftExportSmokeTest")
+}
+
 tasks.register("setupAndroidSdk") {
     group = "setup"
     description = "Downloads and configures the project-local Android SDK. (Alias for ensureAndroidSdk)"
@@ -913,18 +923,30 @@ tasks.register("hostTests") {
 // Patch generated SPM Package.swift to include minimum macOS platform for Swift Concurrency
 tasks.matching { it.name.contains("GenerateSPMPackage") }.configureEach {
     doLast {
-        val spmDir = layout.buildDirectory.dir("SPMPackage").orNull?.asFile
+        val spmDir =
+            layout.buildDirectory
+                .dir("SPMPackage")
+                .orNull
+                ?.asFile
         if (spmDir != null && spmDir.exists()) {
             spmDir.walkTopDown().filter { it.name == "Package.swift" }.forEach { file ->
-                val text = file.readText()
+                var text = file.readText()
+                if (text.contains("swift-tools-version: 6.0")) {
+                    text = text.replace("swift-tools-version: 6.0", "swift-tools-version: 5.9")
+                }
                 if (!text.contains("platforms:")) {
-                    file.writeText(
+                    text =
                         text.replaceFirst(
                             Regex("""(let package = Package\s*\(\s*name:\s*"[^"]*",)"""),
-                            "$1\n    platforms: [.macOS(.v14)],",
-                        ),
-                    )
+                            "$1\n    platforms: [.macOS(\"15.0\")],",
+                        )
+                } else if (text.contains(".macOS(.v15)") || text.contains(".macOS(.v14)")) {
+                    text =
+                        text
+                            .replace(".macOS(.v15)", ".macOS(\"15.0\")")
+                            .replace(".macOS(.v14)", ".macOS(\"15.0\")")
                 }
+                file.writeText(text)
             }
         }
     }
@@ -971,7 +993,7 @@ tasks.register("swiftExportSmokeTest") {
                         "CONFIGURATION" to "Debug",
                         "ARCHS" to "arm64",
                         "FRAMEWORKS_FOLDER_PATH" to "Frameworks",
-                        "MACOSX_DEPLOYMENT_TARGET" to "14.0",
+                        "MACOSX_DEPLOYMENT_TARGET" to "15.0",
                         "DEPLOYMENT_TARGET_SETTING_NAME" to "MACOSX_DEPLOYMENT_TARGET",
                     ),
                 )
