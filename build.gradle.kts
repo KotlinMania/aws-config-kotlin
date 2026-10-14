@@ -923,7 +923,11 @@ tasks.register("hostTests") {
 // Patch generated SPM Package.swift to include minimum macOS platform for Swift Concurrency
 tasks.matching { it.name.contains("GenerateSPMPackage") }.configureEach {
     doLast {
-        val spmDir = layout.buildDirectory.dir("SPMPackage").orNull?.asFile
+        val spmDir =
+            layout.buildDirectory
+                .dir("SPMPackage")
+                .orNull
+                ?.asFile
         if (spmDir != null && spmDir.exists()) {
             spmDir.walkTopDown().filter { it.name == "Package.swift" }.forEach { file ->
                 var text = file.readText()
@@ -937,7 +941,10 @@ tasks.matching { it.name.contains("GenerateSPMPackage") }.configureEach {
                             "$1\n    platforms: [.macOS(\"15.0\")],",
                         )
                 } else if (text.contains(".macOS(.v15)") || text.contains(".macOS(.v14)")) {
-                    text = text.replace(".macOS(.v15)", ".macOS(\"15.0\")").replace(".macOS(.v14)", ".macOS(\"15.0\")")
+                    text =
+                        text
+                            .replace(".macOS(.v15)", ".macOS(\"15.0\")")
+                            .replace(".macOS(.v14)", ".macOS(\"15.0\")")
                 }
                 file.writeText(text)
             }
