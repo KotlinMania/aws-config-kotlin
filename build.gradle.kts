@@ -923,15 +923,20 @@ tasks.matching { it.name.contains("GenerateSPMPackage") }.configureEach {
         val spmDir = layout.buildDirectory.dir("SPMPackage").orNull?.asFile
         if (spmDir != null && spmDir.exists()) {
             spmDir.walkTopDown().filter { it.name == "Package.swift" }.forEach { file ->
-                val text = file.readText()
+                var text = file.readText()
+                if (text.contains("swift-tools-version: 6.0")) {
+                    text = text.replace("swift-tools-version: 6.0", "swift-tools-version: 5.9")
+                }
                 if (!text.contains("platforms:")) {
-                    file.writeText(
+                    text =
                         text.replaceFirst(
                             Regex("""(let package = Package\s*\(\s*name:\s*"[^"]*",)"""),
-                            "$1\n    platforms: [.macOS(.v14)],",
-                        ),
-                    )
+                            "$1\n    platforms: [.macOS(\"15.0\")],",
+                        )
+                } else if (text.contains(".macOS(.v15)") || text.contains(".macOS(.v14)")) {
+                    text = text.replace(".macOS(.v15)", ".macOS(\"15.0\")").replace(".macOS(.v14)", ".macOS(\"15.0\")")
                 }
+                file.writeText(text)
             }
         }
     }
