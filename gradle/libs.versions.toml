@@ -56,13 +56,9 @@ aws-config-kotlin-commonMain = [
   "kotlinx-datetime",
   "collections-immutable",
   "aws-credential-types-kotlin",
-  "futures-kotlin",
   "http-kotlin",
   "p256-kotlin",
   "serde-kotlin",
   "sha2-kotlin",
-  "tokio-kotlin",
-  "tracing-kotlin",
   "zeroize-kotlin",
-  "rand-kotlin",
 ]
