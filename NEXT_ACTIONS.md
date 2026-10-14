@@ -4,14 +4,16 @@ Based on AST analysis, here are the concrete next steps.
 
 ## Summary
 
-- **Files Present:** 7/62 (11.3%)
-- **Function parity:** 18/667 matched (target 38) — 2.7%
-- **Class/type parity:** 9/159 matched (target 32) — 5.7%
-- **Combined symbol parity:** 27/826 matched (target 70) — 3.3%
-- **Average inline-code cosine:** 0.28 (function body across 5 matched files)
+- **Files Present:** 6/62 (9.7%)
+- **Function parity:** 24/672 matched (target 38) — 3.6%
+- **Class/type parity:** 12/159 matched (target 32) — 7.5%
+- **Combined symbol parity:** 36/831 matched (target 70) — 4.3%
+- **Average inline-code cosine:** 0.11 (function body across 5 matched files)
 - **Average documentation cosine:** 0.38 (doc text across 5 matched files)
-- **Cheat-zeroed Files:** 2
-- **Critical Issues:** 7 files with <0.60 function similarity
+- **Cheat-zeroed Files:** 1
+- **Critical Issues:** 6 files with <0.60 function similarity
+- **Needs Review:** 0 files with 0.60-0.84 function similarity
+- **Excellent:** 0 files with >=0.85 function similarity
 
 ## Priority 1: Fix Incomplete High-Dependency Files
 
@@ -40,9 +42,9 @@ Every matched file is listed below with function and type symbol parity.
 ### 1. profile
 
 - **Target:** `profile.Profile`
-- **Similarity:** 0.14
+- **Similarity:** 0.01
 - **Dependents:** 2
-- **Priority Score:** 2030608.6
+- **Priority Score:** 2030609.9
 - **Functions:** 1/4 matched (target 1)
 - **Missing functions:** `new`, `taken_error`, `value_initialized_once`
 - **Types:** 2/2 matched (target 7)
@@ -52,73 +54,59 @@ Every matched file is listed below with function and type symbol parity.
 ### 2. default_provider.auth_scheme_preference
 
 - **Target:** `authschemepreference.AuthSchemePreference`
-- **Similarity:** 0.17
+- **Similarity:** 0.05
 - **Dependents:** 1
-- **Priority Score:** 1040708.3
+- **Priority Score:** 1040709.6
 - **Functions:** 2/6 matched (target 5)
 - **Missing functions:** `auth_scheme_preference_provider`, `fmt`, `environment_priority`, `load_from_profile`
 - **Types:** 1/1 matched (target 6)
 - **Missing types:** _none_
 - **Tests:** 1/3 matched
 
-### 3. environment.mod
-
-- **Target:** `environment.Mod [STUB]`
-- **Similarity:** 0.00
-- **Dependents:** 0
-- **Priority Score:** 70710.0
-- **Functions:** 0/4 matched (target 0)
-- **Missing functions:** `fmt`, `parse_bool`, `parse_uint`, `parse_url`
-- **Types:** 0/3 matched (target 1)
-- **Missing types:** `InvalidBooleanValue`, `InvalidUintValue`, `InvalidUrlValue`
-
-### 4. json_credentials
+### 3. json_credentials
 
 - **Target:** `awsconfig.JsonCredentials`
-- **Similarity:** 0.42
+- **Similarity:** 0.13
 - **Dependents:** 0
-- **Priority Score:** 21605.8
-- **Functions:** 11/13 matched (target 16)
-- **Missing functions:** `from`, `fmt`
+- **Priority Score:** 41808.7
+- **Functions:** 11/15 matched (target 16)
+- **Missing functions:** `from`, `from`, `fmt`, `fmt`
 - **Types:** 3/3 matched (target 9)
 - **Missing types:** _none_
 - **Tests:** 9/9 matched
 
+### 4. sensitive_command
+
+- **Target:** `awsconfig.CommandWithSensitiveArgs`
+- **Similarity:** 0.16
+- **Dependents:** 0
+- **Priority Score:** 20608.4
+- **Functions:** 3/5 matched (target 4)
+- **Missing functions:** `fmt`, `fmt`
+- **Types:** 1/1 matched
+- **Missing types:** _none_
+
 ### 5. retry
 
 - **Target:** `retry.Retry`
-- **Similarity:** 0.29
+- **Similarity:** 0.19
 - **Dependents:** 0
-- **Priority Score:** 20507.1
+- **Priority Score:** 20508.1
 - **Functions:** 1/3 matched
 - **Missing functions:** `fmt`, `source`
 - **Types:** 2/2 matched (target 5)
 - **Missing types:** _none_
 
-### 6. sensitive_command
+### 6. environment.mod
 
-- **Target:** `awsconfig.CommandWithSensitiveArgs`
-- **Similarity:** 0.37
-- **Dependents:** 0
-- **Priority Score:** 10506.3
-- **Functions:** 3/4 matched
-- **Missing functions:** `fmt`
-- **Types:** 1/1 matched
-- **Missing types:** _none_
-
-### 7. imds.mod
-
-- **Target:** `environment.Parsing [STUB] [PROVENANCE-FALLBACK]`
+- **Target:** `environment.Mod [STUB]`
 - **Similarity:** 0.00
 - **Dependents:** 0
-- **Priority Score:** 10.0
-- **Functions:** 0/0 matched (target 9)
+- **Priority Score:** 910.0
+- **Functions:** 6/6 matched (target 9)
 - **Missing functions:** _none_
-- **Types:** 0/0 matched (target 3)
+- **Types:** 3/3 matched (target 4)
 - **Missing types:** _none_
-- **Provenance warning:** port-lint provenance header matched only by basename: `environment/mod.rs` vs expected `imds/mod.rs`
-- **Proposed provenance header:** `// port-lint: source imds/mod.rs` (current: `// port-lint: source environment/mod.rs`)
-- **Lint issues:** 1
 
 ## Success Criteria
 
@@ -140,6 +128,7 @@ do not treat them as the next implementation target by default.
 
 | Source | Expected target | Deps | Source path | Expected path |
 |--------|-----------------|------|-------------|---------------|
+| `imds.mod` | `imds.Mod` | 0 | `imds/mod.rs` | `imds/Mod.kt` |
 | `lib` | `Lib` | 0 | `lib.rs` | `Lib.kt` |
 | `credentials.mod` | `meta.credentials.Mod` | 0 | `meta/credentials/mod.rs` | `meta/credentials/Mod.kt` |
 | `meta.mod` | `meta.Mod` | 0 | `meta/mod.rs` | `meta/Mod.kt` |
