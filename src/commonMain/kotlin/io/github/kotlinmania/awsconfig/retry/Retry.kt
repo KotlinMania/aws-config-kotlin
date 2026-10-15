@@ -41,11 +41,18 @@ class RetryConfigError internal constructor(
 
         private fun messageFor(kind: RetryConfigErrorKind): String =
             when (kind) {
-                is RetryConfigErrorKind.InvalidRetryMode -> "invalid retry configuration"
-                RetryConfigErrorKind.MaxAttemptsMustNotBeZero ->
+                is RetryConfigErrorKind.InvalidRetryMode -> {
+                    "invalid retry configuration"
+                }
+
+                RetryConfigErrorKind.MaxAttemptsMustNotBeZero -> {
                     "invalid configuration: It is invalid to set max attempts to 0. " +
                         "Unset it or set it to an integer greater than or equal to one."
-                is RetryConfigErrorKind.FailedToParseMaxAttempts -> "failed to parse max attempts"
+                }
+
+                is RetryConfigErrorKind.FailedToParseMaxAttempts -> {
+                    "failed to parse max attempts"
+                }
             }
 
         private fun sourceFor(kind: RetryConfigErrorKind): Throwable? =

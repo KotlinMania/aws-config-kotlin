@@ -80,8 +80,8 @@ internal fun parseJsonCredentials(credentialsResponse: String): Result<JsonCrede
     jsonParseLoop(credentialsResponse) { _, _ -> Result.success(Unit) }.fold(
         onSuccess = {
             val root =
-                parseJsonObject(credentialsResponse).getOrElse {
-                    return Result.failure(it)
+                parseJsonObject(credentialsResponse).getOrElse { error ->
+                    return Result.failure(error)
                 }
             try {
                 Result.success(parseJsonCredentialsObject(root))
@@ -123,12 +123,15 @@ private fun parseJsonCredentialsObject(root: JsonObject): JsonCredentials {
             key.equals("Code", ignoreCase = true) && stringValue != null -> {
                 code = stringValue
             }
+
             key.equals("AccessKeyId", ignoreCase = true) && stringValue != null -> {
                 accessKeyId = stringValue
             }
+
             key.equals("SecretAccessKey", ignoreCase = true) && stringValue != null -> {
                 secretAccessKey = stringValue
             }
+
             (
                 key.equals("Token", ignoreCase = true) ||
                     key.equals("SessionToken", ignoreCase = true)
@@ -136,9 +139,11 @@ private fun parseJsonCredentialsObject(root: JsonObject): JsonCredentials {
                 stringValue != null -> {
                 sessionToken = stringValue
             }
+
             key.equals("AccountId", ignoreCase = true) && stringValue != null -> {
                 accountId = stringValue
             }
+
             (
                 key.equals("Expiration", ignoreCase = true) ||
                     key.equals("ExpiresAt", ignoreCase = true)
@@ -184,11 +189,13 @@ private fun parseJsonCredentialsObject(root: JsonObject): JsonCredentials {
                 ),
             )
         }
-        else ->
+
+        else -> {
             JsonCredentials.Error(
                 code = codeValue,
                 message = message ?: "no message",
             )
+        }
     }
 }
 
