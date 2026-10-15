@@ -67,3 +67,5 @@ DerivedData/
 *.xcuserstate
 *.xcworkspace/xcuserdata/
 *.xcodeproj/xcuserdata/
+local.properties
+/native/node-ffi/node_modules/*
