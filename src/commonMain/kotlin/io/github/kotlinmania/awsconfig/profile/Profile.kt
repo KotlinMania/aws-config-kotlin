@@ -34,23 +34,29 @@ internal class ErrorTakingOnceCell<T, E> {
     ): ErrorTakingResult<T, E> =
         mutex.withLock {
             when (val current = cell) {
-                is Cell.Value -> ErrorTakingResult.Ok(current.value)
+                is Cell.Value -> {
+                    ErrorTakingResult.Ok(current.value)
+                }
+
                 is Cell.Error -> {
                     val error = current.error
                     current.error = takenError
                     ErrorTakingResult.Err(error)
                 }
-                null ->
+
+                null -> {
                     when (val initialized = init()) {
                         is ErrorTakingResult.Ok -> {
                             cell = Cell.Value(initialized.value)
                             ErrorTakingResult.Ok(initialized.value)
                         }
+
                         is ErrorTakingResult.Err -> {
                             cell = Cell.Error(initialized.error)
                             ErrorTakingResult.Err(initialized.error)
                         }
                     }
+                }
             }
         }
 
