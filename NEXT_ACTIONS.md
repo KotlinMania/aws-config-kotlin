@@ -4,12 +4,12 @@ Based on AST analysis, here are the concrete next steps.
 
 ## Summary
 
-- **Files Present:** 6/62 (9.7%)
-- **Function parity:** 24/672 matched (target 38) — 3.6%
-- **Class/type parity:** 12/159 matched (target 32) — 7.5%
-- **Combined symbol parity:** 36/831 matched (target 70) — 4.3%
+- **Files Present:** 6/63 (9.5%)
+- **Function parity:** 26/673 matched (target 52) — 3.9%
+- **Class/type parity:** 12/159 matched (target 43) — 7.5%
+- **Combined symbol parity:** 38/832 matched (target 95) — 4.6%
 - **Average inline-code cosine:** 0.11 (function body across 5 matched files)
-- **Average documentation cosine:** 0.38 (doc text across 5 matched files)
+- **Average documentation cosine:** 0.37 (doc text across 5 matched files)
 - **Cheat-zeroed Files:** 1
 - **Critical Issues:** 6 files with <0.60 function similarity
 - **Needs Review:** 0 files with 0.60-0.84 function similarity
@@ -24,15 +24,15 @@ No incomplete high-dependency files detected.
 Critical missing files (>10 dependencies):
 
 1. **provider_config** (28 deps)
-   - Path: `provider_config.rs`
+   - Path: `src/provider_config.rs`
    - Essential for 28 other files
 
 2. **sso.credentials** (12 deps)
-   - Path: `sso/credentials.rs`
+   - Path: `src/sso/credentials.rs`
    - Essential for 12 other files
 
 3. **imds.region** (11 deps)
-   - Path: `imds/region.rs`
+   - Path: `src/imds/region.rs`
    - Essential for 11 other files
 
 ## Detailed Work Items
@@ -66,12 +66,12 @@ Every matched file is listed below with function and type symbol parity.
 ### 3. json_credentials
 
 - **Target:** `awsconfig.JsonCredentials`
-- **Similarity:** 0.13
+- **Similarity:** 0.15
 - **Dependents:** 0
-- **Priority Score:** 41808.7
-- **Functions:** 11/15 matched (target 16)
-- **Missing functions:** `from`, `from`, `fmt`, `fmt`
-- **Types:** 3/3 matched (target 9)
+- **Priority Score:** 21808.5
+- **Functions:** 13/15 matched (target 26)
+- **Missing functions:** `from`, `fmt`
+- **Types:** 3/3 matched (target 20)
 - **Missing types:** _none_
 - **Tests:** 9/9 matched
 
@@ -92,7 +92,7 @@ Every matched file is listed below with function and type symbol parity.
 - **Similarity:** 0.19
 - **Dependents:** 0
 - **Priority Score:** 20508.1
-- **Functions:** 1/3 matched
+- **Functions:** 1/3 matched (target 7)
 - **Missing functions:** `fmt`, `source`
 - **Types:** 2/2 matched (target 5)
 - **Missing types:** _none_
@@ -128,8 +128,8 @@ do not treat them as the next implementation target by default.
 
 | Source | Expected target | Deps | Source path | Expected path |
 |--------|-----------------|------|-------------|---------------|
-| `imds.mod` | `imds.Mod` | 0 | `imds/mod.rs` | `imds/Mod.kt` |
-| `lib` | `Lib` | 0 | `lib.rs` | `Lib.kt` |
-| `credentials.mod` | `meta.credentials.Mod` | 0 | `meta/credentials/mod.rs` | `meta/credentials/Mod.kt` |
-| `meta.mod` | `meta.Mod` | 0 | `meta/mod.rs` | `meta/Mod.kt` |
+| `imds.mod` | `imds.Mod` | 0 | `src/imds/mod.rs` | `imds/Mod.kt` |
+| `lib` | `Lib` | 0 | `src/lib.rs` | `Lib.kt` |
+| `credentials.mod` | `meta.credentials.Mod` | 0 | `src/meta/credentials/mod.rs` | `meta/credentials/Mod.kt` |
+| `meta.mod` | `meta.Mod` | 0 | `src/meta/mod.rs` | `meta/Mod.kt` |
 

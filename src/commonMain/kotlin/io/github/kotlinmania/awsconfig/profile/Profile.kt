@@ -1,4 +1,4 @@
-// port-lint: source profile.rs
+// port-lint: source src/profile.rs
 package io.github.kotlinmania.awsconfig.profile
 
 /*

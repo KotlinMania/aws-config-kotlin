@@ -1,15 +1,10 @@
-// port-lint: source retry.rs
-@file:OptIn(ExperimentalObjCRefinement::class)
-
+// port-lint: source src/retry.rs
 package io.github.kotlinmania.awsconfig.retry
 
 /*
  * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
  * SPDX-License-Identifier: Apache-2.0
  */
-
-import kotlin.experimental.ExperimentalObjCRefinement
-import kotlin.native.HiddenFromObjC
 
 // Retry configuration.
 
@@ -32,12 +27,21 @@ internal sealed class RetryConfigErrorKind {
 }
 
 /** Failure to parse retry config from profile file or environment variable. */
-@HiddenFromObjC
 class RetryConfigError internal constructor(
     internal val kind: RetryConfigErrorKind,
 ) : Exception(messageFor(kind), sourceFor(kind)) {
+    fun errorDescription(): String = message ?: "RetryConfigError"
+
     companion object {
         internal fun from(kind: RetryConfigErrorKind): RetryConfigError = RetryConfigError(kind)
+
+        fun maxAttemptsMustNotBeZero(): RetryConfigError = RetryConfigError(RetryConfigErrorKind.MaxAttemptsMustNotBeZero)
+
+        fun invalidRetryMode(message: String): RetryConfigError =
+            RetryConfigError(RetryConfigErrorKind.InvalidRetryMode(Exception(message)))
+
+        fun failedToParseMaxAttempts(message: String): RetryConfigError =
+            RetryConfigError(RetryConfigErrorKind.FailedToParseMaxAttempts(Exception(message)))
 
         private fun messageFor(kind: RetryConfigErrorKind): String =
             when (kind) {

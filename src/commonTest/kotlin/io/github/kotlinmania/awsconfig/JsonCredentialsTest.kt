@@ -1,4 +1,4 @@
-// port-lint: tests json_credentials.rs
+// port-lint: tests src/json_credentials.rs
 package io.github.kotlinmania.awsconfig
 
 import kotlin.test.Test
@@ -25,13 +25,13 @@ class JsonCredentialsTest {
             """.trimIndent()
         val parsed = parseJsonCredentials(response).getOrThrow()
         assertEquals(
-            JsonCredentials.RefreshableCredentials(
+            JsonCredentials.Refreshable(
                 RefreshableCredentials(
                     accessKeyId = "ASIARTEST",
                     secretAccessKey = "xjtest",
                     sessionToken = "IQote///test",
                     accountId = "111122223333",
-                    expiration = Instant.fromEpochSeconds(1_631_935_916),
+                    expiration = Instant.fromEpochSeconds(1631935916),
                 ),
             ),
             parsed,
@@ -52,7 +52,7 @@ class JsonCredentialsTest {
 
     @Test
     fun jsonCredentialsMissingCode() {
-        val response =
+        val resp =
             """
             {
                 "LastUpdated" : "2021-09-17T20:57:08Z",
@@ -64,15 +64,15 @@ class JsonCredentialsTest {
                 "Expiration" : "2021-09-18T03:31:56Z"
             }
             """.trimIndent()
-        val parsed = parseJsonCredentials(response).getOrThrow()
+        val parsed = parseJsonCredentials(resp).getOrThrow()
         assertEquals(
-            JsonCredentials.RefreshableCredentials(
+            JsonCredentials.Refreshable(
                 RefreshableCredentials(
                     accessKeyId = "ASIARTEST",
                     secretAccessKey = "xjtest",
                     sessionToken = "IQote///test",
                     accountId = "111122223333",
-                    expiration = Instant.fromEpochSeconds(1_631_935_916),
+                    expiration = Instant.fromEpochSeconds(1631935916),
                 ),
             ),
             parsed,
@@ -81,7 +81,7 @@ class JsonCredentialsTest {
 
     @Test
     fun jsonCredentialsRequiredSessionToken() {
-        val response =
+        val resp =
             """
             {
                 "LastUpdated" : "2021-09-17T20:57:08Z",
@@ -92,13 +92,17 @@ class JsonCredentialsTest {
                 "Expiration" : "2021-09-18T03:31:56Z"
             }
             """.trimIndent()
-        val parsed = parseJsonCredentials(response).exceptionOrNull()
-        assertEquals("Expected field `Token` in response but it was missing", parsed?.message)
+        val parsed = parseJsonCredentials(resp).exceptionOrNull()
+        assertIs<InvalidJsonCredentials.MissingField>(parsed)
+        assertEquals(
+            "Expected field `Token` in response but it was missing",
+            parsed.message,
+        )
     }
 
     @Test
     fun jsonCredentialsMissingAkid() {
-        val response =
+        val resp =
             """
             {
                 "Code": "Success",
@@ -110,8 +114,9 @@ class JsonCredentialsTest {
                 "Expiration" : "2021-09-18T03:31:56Z"
             }
             """.trimIndent()
-        val error = parseJsonCredentials(response).exceptionOrNull()
+        val error = parseJsonCredentials(resp).exceptionOrNull()
         assertIs<InvalidJsonCredentials.MissingField>(error)
+        assertEquals("AccessKeyId", error.field)
     }
 
     @Test
@@ -134,10 +139,8 @@ class JsonCredentialsTest {
         )
     }
 
-    /** Validate the specific JSON response format sent by ECS. */
     @Test
     fun jsonCredentialsEcs() {
-        // Identical, but extra `RoleArn` field is present.
         val response =
             """
             {
@@ -150,10 +153,12 @@ class JsonCredentialsTest {
             }
             """.trimIndent()
         val parsed = parseJsonCredentials(response).getOrThrow()
-        assertIs<JsonCredentials.RefreshableCredentials>(parsed)
+        assertIs<JsonCredentials.Refreshable>(parsed)
+        assertEquals("ASIARTEST", parsed.credentials.accessKeyId)
+        assertEquals("SECRETTEST", parsed.credentials.secretAccessKey)
         assertTrue(parsed.credentials.sessionToken.startsWith("token"))
         assertEquals("111122223333", parsed.credentials.accountId)
-        assertEquals(Instant.fromEpochSeconds(1_234_567_890), parsed.credentials.expiration)
+        assertEquals(Instant.fromEpochSeconds(1234567890), parsed.credentials.expiration)
     }
 
     @Test
@@ -176,40 +181,113 @@ class JsonCredentialsTest {
     }
 
     @Test
-    fun refreshableCredentialsSerdeSerializeAndDeserialize() {
+    fun aliasesAndCaseSensitivity() {
+        val response =
+            """
+            {
+              "accesskeyid": "MY_KEY",
+              "secretaccesskey": "MY_SECRET",
+              "sessiontoken": "MY_TOKEN",
+              "accountid": "000111222333",
+              "expiresat": "2024-01-01T00:00:00Z"
+            }
+            """.trimIndent()
+        val parsed = parseJsonCredentials(response).getOrThrow()
+        assertIs<JsonCredentials.Refreshable>(parsed)
+        assertEquals("MY_KEY", parsed.credentials.accessKeyId)
+        assertEquals("MY_SECRET", parsed.credentials.secretAccessKey)
+        assertEquals("MY_TOKEN", parsed.credentials.sessionToken)
+        assertEquals("000111222333", parsed.credentials.accountId)
+        assertEquals(Instant.parse("2024-01-01T00:00:00Z"), parsed.credentials.expiration)
+    }
+
+    @Test
+    fun unknownAndNestedValuesIgnored() {
+        val response =
+            """
+            {
+              "Code": "Success",
+              "AccessKeyId": "AKIA123",
+              "SecretAccessKey": "SECRET123",
+              "Token": "TOKEN123",
+              "Expiration": "2024-01-01T00:00:00Z",
+              "NestedObject": {
+                "key1": "val1",
+                "nestedList": [1, 2, {"inner": "val"}]
+              },
+              "ArrayField": ["item1", "item2"]
+            }
+            """.trimIndent()
+        val parsed = parseJsonCredentials(response).getOrThrow()
+        assertIs<JsonCredentials.Refreshable>(parsed)
+        assertEquals("AKIA123", parsed.credentials.accessKeyId)
+    }
+
+    @Test
+    fun duplicateKeysOverwriteOrder() {
+        val response =
+            """
+            {
+              "AccessKeyId": "INITIAL_KEY",
+              "AccessKeyId": "OVERWRITTEN_KEY",
+              "SecretAccessKey": "SECRET",
+              "Token": "TOKEN",
+              "Expiration": "2024-01-01T00:00:00Z"
+            }
+            """.trimIndent()
+        val parsed = parseJsonCredentials(response).getOrThrow()
+        assertIs<JsonCredentials.Refreshable>(parsed)
+        assertEquals("OVERWRITTEN_KEY", parsed.credentials.accessKeyId)
+    }
+
+    @Test
+    fun trailingTokensRejected() {
+        val response =
+            """
+            {
+              "AccessKeyId": "KEY",
+              "SecretAccessKey": "SECRET",
+              "Token": "TOKEN",
+              "Expiration": "2024-01-01T00:00:00Z"
+            } trailing
+            """.trimIndent()
+        val error = parseJsonCredentials(response).exceptionOrNull()
+        assertIs<InvalidJsonCredentials.Other>(error)
+        assertTrue(error.message?.contains("found more JSON tokens after completing parsing") == true)
+    }
+
+    @Test
+    fun invalidExpirationDateFormat() {
+        val response =
+            """
+            {
+              "AccessKeyId": "KEY",
+              "SecretAccessKey": "SECRET",
+              "Token": "TOKEN",
+              "Expiration": "not-a-valid-date"
+            }
+            """.trimIndent()
+        val error = parseJsonCredentials(response).exceptionOrNull()
+        assertIs<InvalidJsonCredentials.InvalidField>(error)
+        assertEquals("Expiration", error.field)
+    }
+
+    @Test
+    fun debugRedactionContract() {
         val creds =
             RefreshableCredentials(
-                accessKeyId = "AKIAIOSFODNN7EXAMPLE",
-                secretAccessKey = "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
-                sessionToken = "tokenExample",
+                accessKeyId = "AKIAEXAMPLE",
+                secretAccessKey = "SUPER_SECRET_KEY_NOT_LEAKED",
+                sessionToken = "SESSION_TOKEN_NOT_LEAKED",
                 accountId = "123456789012",
-                expiration = Instant.fromEpochSeconds(1_700_000_000),
+                expiration = Instant.parse("2024-01-01T00:00:00Z"),
             )
-        val jsonOutput =
-            io.github.kotlinmania.serdejson
-                .toStr(creds)
-                .getOrThrow()
-        assertTrue(jsonOutput.contains("accessKeyId"))
-        assertTrue(jsonOutput.contains("** redacted **"))
-
-        val deserialized =
-            io.github.kotlinmania.serdejson
-                .fromStr(
-                    """
-                    {
-                      "AccessKeyId": "AKIAIOSFODNN7EXAMPLE",
-                      "SecretAccessKey": "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
-                      "SessionToken": "tokenExample",
-                      "AccountId": "123456789012",
-                      "Expiration": "2023-11-14T22:13:20Z"
-                    }
-                    """.trimIndent(),
-                    RefreshableCredentials,
-                ).getOrThrow()
-        assertEquals("AKIAIOSFODNN7EXAMPLE", deserialized.accessKeyId)
-        assertEquals("wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY", deserialized.secretAccessKey)
-        assertEquals("tokenExample", deserialized.sessionToken)
-        assertEquals("123456789012", deserialized.accountId)
-        assertEquals(Instant.fromEpochSeconds(1_700_000_000), deserialized.expiration)
+        val debugString = creds.toString()
+        assertTrue(debugString.contains("access_key_id: \"AKIAEXAMPLE\""))
+        assertTrue(debugString.contains("secret_access_key: \"** redacted **\""))
+        assertTrue(debugString.contains("session_token: \"** redacted **\""))
+        assertTrue(!debugString.contains("SUPER_SECRET_KEY_NOT_LEAKED"))
+        assertTrue(!debugString.contains("SESSION_TOKEN_NOT_LEAKED"))
+        assertTrue(debugString.contains("account_id: \"123456789012\""))
     }
 }

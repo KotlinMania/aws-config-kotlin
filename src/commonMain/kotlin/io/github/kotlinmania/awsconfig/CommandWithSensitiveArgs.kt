@@ -1,4 +1,4 @@
-// port-lint: source sensitive_command.rs
+// port-lint: source src/sensitive_command.rs
 package io.github.kotlinmania.awsconfig
 
 /*

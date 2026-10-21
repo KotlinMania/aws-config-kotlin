@@ -53,8 +53,6 @@ aws-config-kotlin-commonMain = [
   "aws-credential-types-kotlin",
   "http-kotlin",
   "p256-kotlin",
-  "serde-kotlin",
-  "serde-json-kotlin",
   "sha2-kotlin",
   "zeroize-kotlin",
 ]

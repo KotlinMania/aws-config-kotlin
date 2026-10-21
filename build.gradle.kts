@@ -143,9 +143,10 @@ configurations.configureEach {
             ),
         )
     }
-    if (name.contains("androidDeviceTest", ignoreCase = true) ||
-        (name.contains("Android", ignoreCase = true) && name.endsWith("RuntimeClasspath"))
-    ) {
+    // proc-macro-kotlin's published Android artifact bundles the JetBrains
+    // annotation classes, which duplicate org.jetbrains:annotations on the
+    // Android device-test classpath.
+    if (name.contains("androidDeviceTest", ignoreCase = true)) {
         exclude(group = "org.jetbrains", module = "annotations")
     }
 }

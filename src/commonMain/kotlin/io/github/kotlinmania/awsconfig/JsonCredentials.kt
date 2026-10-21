@@ -1,4 +1,4 @@
-// port-lint: source json_credentials.rs
+// port-lint: source src/json_credentials.rs
 package io.github.kotlinmania.awsconfig
 
 /*
@@ -6,18 +6,6 @@ package io.github.kotlinmania.awsconfig
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import io.github.kotlinmania.serde.SerdeError
-import io.github.kotlinmania.serde.SerdeResult
-import io.github.kotlinmania.serdecore.de.Deserialize
-import io.github.kotlinmania.serdecore.de.Deserializer
-import io.github.kotlinmania.serdecore.de.IgnoredAny
-import io.github.kotlinmania.serdecore.de.MapAccess
-import io.github.kotlinmania.serdecore.de.StringDeserialize
-import io.github.kotlinmania.serdecore.de.Visitor
-import io.github.kotlinmania.serdecore.ser.Serialize
-import io.github.kotlinmania.serdecore.ser.Serializer
-import io.github.kotlinmania.serdejson.Value
-import io.github.kotlinmania.serdejson.fromStr
 import kotlin.time.Instant
 
 internal sealed class InvalidJsonCredentials(
@@ -27,7 +15,9 @@ internal sealed class InvalidJsonCredentials(
     /** The response did not contain valid JSON */
     internal class JsonError(
         error: Throwable,
-    ) : InvalidJsonCredentials("invalid JSON in response: ${error.message ?: error}", error)
+    ) : InvalidJsonCredentials("invalid JSON in response: ${error.message ?: error}", error) {
+        constructor(message: String) : this(Exception(message))
+    }
 
     /** The response was missing a required field */
     internal class MissingField(
@@ -47,8 +37,14 @@ internal sealed class InvalidJsonCredentials(
 
     fun fmt(): String = message ?: toString()
 
+    override fun toString(): String = fmt()
+
     companion object {
-        fun from(err: Throwable): InvalidJsonCredentials = JsonError(err)
+        fun from(error: Throwable): InvalidJsonCredentials =
+            when (error) {
+                is InvalidJsonCredentials -> error
+                else -> JsonError(error)
+            }
     }
 }
 
@@ -56,185 +52,56 @@ internal data class RefreshableCredentials(
     val accessKeyId: String,
     val secretAccessKey: String,
     val sessionToken: String,
-    val accountId: String?,
+    val accountId: String? = null,
     val expiration: Instant,
-) : Serialize {
-    fun fmt(): String = toString()
-
-    override fun toString(): String =
-        "RefreshableCredentials(accessKeyId=$accessKeyId, " +
-            "secretAccessKey=** redacted **, " +
-            "sessionToken=** redacted **" +
-            accountId?.let { ", accountId=$it" }.orEmpty() +
-            ", expiration=$expiration)"
-
-    override fun <Ok> serialize(serializer: Serializer<Ok>): SerdeResult<Ok> =
-        serializer.serializeStruct("RefreshableCredentials", 5).flatMap { struct ->
-            struct
-                .serializeField(
-                    "accessKeyId",
-                    object : Serialize {
-                        override fun <Ok> serialize(serializer: Serializer<Ok>): SerdeResult<Ok> = serializer.serializeStr(accessKeyId)
-                    },
-                ).flatMap {
-                    struct.serializeField(
-                        "secretAccessKey",
-                        object : Serialize {
-                            override fun <Ok> serialize(serializer: Serializer<Ok>): SerdeResult<Ok> = serializer.serializeStr("** redacted **")
-                        },
-                    )
-                }.flatMap {
-                    struct.serializeField(
-                        "sessionToken",
-                        object : Serialize {
-                            override fun <Ok> serialize(serializer: Serializer<Ok>): SerdeResult<Ok> = serializer.serializeStr("** redacted **")
-                        },
-                    )
-                }.flatMap {
-                    if (accountId != null) {
-                        struct.serializeField(
-                            "accountId",
-                            object : Serialize {
-                                override fun <Ok> serialize(serializer: Serializer<Ok>): SerdeResult<Ok> = serializer.serializeStr(accountId)
-                            },
-                        )
-                    } else {
-                        SerdeResult.success(Unit)
-                    }
-                }.flatMap {
-                    struct.serializeField(
-                        "expiration",
-                        object : Serialize {
-                            override fun <Ok> serialize(serializer: Serializer<Ok>): SerdeResult<Ok> = serializer.serializeStr(expiration.toString())
-                        },
-                    )
-                }.flatMap { struct.end() }
-        }
-
-    companion object : Deserialize<RefreshableCredentials> {
-        override fun <D : Deserializer> deserialize(deserializer: D): SerdeResult<RefreshableCredentials> =
-            deserializer.deserializeMap(
-                object : Visitor<RefreshableCredentials> {
-                    override fun expecting(): String = "struct RefreshableCredentials"
-
-                    override fun <A : MapAccess> visitMap(access: A): SerdeResult<RefreshableCredentials> {
-                        var akid: String? = null
-                        var secret: String? = null
-                        var token: String? = null
-                        var acct: String? = null
-                        var exp: Instant? = null
-
-                        while (true) {
-                            val keyOutcome = access.nextKey(StringDeserialize)
-                            if (keyOutcome is SerdeResult.Failure) return keyOutcome
-                            val key = (keyOutcome as SerdeResult.Success).value ?: break
-                            when {
-                                key.equals("accessKeyId", ignoreCase = true) ||
-                                    key.equals("AccessKeyId", ignoreCase = true) -> {
-                                    val v = access.nextValue(StringDeserialize)
-                                    if (v is SerdeResult.Failure) return v
-                                    akid = (v as SerdeResult.Success).value
-                                }
-
-                                key.equals("secretAccessKey", ignoreCase = true) ||
-                                    key.equals("SecretAccessKey", ignoreCase = true) -> {
-                                    val v = access.nextValue(StringDeserialize)
-                                    if (v is SerdeResult.Failure) return v
-                                    secret = (v as SerdeResult.Success).value
-                                }
-
-                                key.equals("sessionToken", ignoreCase = true) ||
-                                    key.equals("SessionToken", ignoreCase = true) ||
-                                    key.equals("token", ignoreCase = true) ||
-                                    key.equals("Token", ignoreCase = true) -> {
-                                    val v = access.nextValue(StringDeserialize)
-                                    if (v is SerdeResult.Failure) return v
-                                    token = (v as SerdeResult.Success).value
-                                }
-
-                                key.equals("accountId", ignoreCase = true) ||
-                                    key.equals("AccountId", ignoreCase = true) -> {
-                                    val v = access.nextValue(StringDeserialize)
-                                    if (v is SerdeResult.Failure) return v
-                                    acct = (v as SerdeResult.Success).value
-                                }
-
-                                key.equals("expiration", ignoreCase = true) ||
-                                    key.equals("Expiration", ignoreCase = true) ||
-                                    key.equals("expiresAt", ignoreCase = true) ||
-                                    key.equals("ExpiresAt", ignoreCase = true) -> {
-                                    val v = access.nextValue(StringDeserialize)
-                                    if (v is SerdeResult.Failure) return v
-                                    val expStr = (v as SerdeResult.Success).value
-                                    exp =
-                                        try {
-                                            Instant.parse(expStr)
-                                        } catch (_: Exception) {
-                                            null
-                                        }
-                                }
-
-                                else -> {
-                                    val ignored = access.nextValue(IgnoredAny)
-                                    if (ignored is SerdeResult.Failure) return ignored
-                                }
-                            }
-                        }
-
-                        if (akid == null) return SerdeResult.failure(SerdeError.missingField("AccessKeyId"))
-                        if (secret == null) return SerdeResult.failure(SerdeError.missingField("SecretAccessKey"))
-                        if (token == null) return SerdeResult.failure(SerdeError.missingField("Token"))
-                        if (exp == null) return SerdeResult.failure(SerdeError.missingField("Expiration"))
-
-                        return SerdeResult.success(
-                            RefreshableCredentials(
-                                accessKeyId = akid,
-                                secretAccessKey = secret,
-                                sessionToken = token,
-                                accountId = acct,
-                                expiration = exp,
-                            ),
-                        )
-                    }
-                },
-            )
+) {
+    override fun toString(): String {
+        val accountPart = if (accountId != null) ", account_id: \"$accountId\"" else ""
+        return "RefreshableCredentials { access_key_id: \"$accessKeyId\", secret_access_key: \"** redacted **\", session_token: \"** redacted **\"$accountPart, expiration: $expiration }"
     }
 }
 
-internal sealed class JsonCredentials : Serialize {
-    data class RefreshableCredentials(
-        val credentials: io.github.kotlinmania.awsconfig.RefreshableCredentials,
-    ) : JsonCredentials() {
-        override fun <Ok> serialize(serializer: Serializer<Ok>): SerdeResult<Ok> =
-            credentials.serialize(serializer)
-    }
+internal sealed class JsonCredentials {
+    internal data class Refreshable(
+        val credentials: RefreshableCredentials,
+    ) : JsonCredentials()
 
-    data class Error(
+    internal data class Error(
         val code: String,
         val message: String,
-    ) : JsonCredentials() {
-        override fun <Ok> serialize(serializer: Serializer<Ok>): SerdeResult<Ok> =
-            serializer.serializeStruct("Error", 2).flatMap { struct ->
-                struct
-                    .serializeField(
-                        "code",
-                        object : Serialize {
-                            override fun <Ok> serialize(serializer: Serializer<Ok>): SerdeResult<Ok> = serializer.serializeStr(code)
-                        },
-                    ).flatMap {
-                        struct.serializeField(
-                            "message",
-                            object : Serialize {
-                                override fun <Ok> serialize(serializer: Serializer<Ok>): SerdeResult<Ok> = serializer.serializeStr(message)
-                            },
-                        )
-                    }.flatMap { struct.end() }
-            }
-    }
+    ) : JsonCredentials()
+}
+
+internal sealed class Token {
+    internal data object StartObject : Token()
+
+    internal data object EndObject : Token()
+
+    internal data class ObjectKey(
+        val key: String,
+    ) : Token()
+
+    internal data class ValueString(
+        val value: String,
+    ) : Token()
+
+    internal data class ValueNumber(
+        val value: String,
+    ) : Token()
+
+    internal data class ValueBool(
+        val value: Boolean,
+    ) : Token()
+
+    internal data object ValueNull : Token()
+
+    internal data object StartArray : Token()
+
+    internal data object EndArray : Token()
 }
 
 /**
- * Deserialize an IMDS response from a string
+ * Deserialize an IMDS response from a string or byte array.
  *
  * There are two levels of error here: the top level distinguishes between a successfully parsed
  * response from the credential provider vs. something invalid / unexpected. The inner error
@@ -243,9 +110,10 @@ internal sealed class JsonCredentials : Serialize {
  *
  * Keys are case insensitive.
  */
-internal fun parseJsonCredentials(
-    credentialsResponse: String,
-): Result<JsonCredentials> {
+internal fun parseJsonCredentials(credentialsResponse: String): Result<JsonCredentials> =
+    parseJsonCredentials(credentialsResponse.encodeToByteArray())
+
+internal fun parseJsonCredentials(credentialsResponse: ByteArray): Result<JsonCredentials> {
     var code: String? = null
     var accessKeyId: String? = null
     var secretAccessKey: String? = null
@@ -254,68 +122,71 @@ internal fun parseJsonCredentials(
     var expiration: String? = null
     var message: String? = null
 
-    val parseLoopResult =
-        jsonParseLoop(credentialsResponse.encodeToByteArray()) { key, value ->
-            val stringValue =
-                when (value) {
-                    is Value.Str -> value.value
-                    else -> null
-                }
-            when {
-                key.equals("Code", ignoreCase = true) && stringValue != null -> {
-                    code = stringValue
-                }
+    val parseResult =
+        jsonParseLoop(credentialsResponse) { key, token ->
+            if (token is Token.ValueString) {
+                val value = token.value
+                when {
+                    key.equals("Code", ignoreCase = true) -> {
+                        code = value
+                    }
 
-                key.equals("AccessKeyId", ignoreCase = true) && stringValue != null -> {
-                    accessKeyId = stringValue
-                }
+                    key.equals("AccessKeyId", ignoreCase = true) -> {
+                        accessKeyId = value
+                    }
 
-                key.equals("SecretAccessKey", ignoreCase = true) && stringValue != null -> {
-                    secretAccessKey = stringValue
-                }
+                    key.equals("SecretAccessKey", ignoreCase = true) -> {
+                        secretAccessKey = value
+                    }
 
-                (key.equals("Token", ignoreCase = true) || key.equals("SessionToken", ignoreCase = true)) && stringValue != null -> {
-                    sessionToken = stringValue
-                }
+                    key.equals("Token", ignoreCase = true) || key.equals("SessionToken", ignoreCase = true) -> {
+                        sessionToken = value
+                    }
 
-                key.equals("AccountId", ignoreCase = true) && stringValue != null -> {
-                    accountId = stringValue
-                }
+                    key.equals("AccountId", ignoreCase = true) -> {
+                        accountId = value
+                    }
 
-                (key.equals("Expiration", ignoreCase = true) || key.equals("ExpiresAt", ignoreCase = true)) && stringValue != null -> {
-                    expiration = stringValue
-                }
+                    key.equals("Expiration", ignoreCase = true) || key.equals("ExpiresAt", ignoreCase = true) -> {
+                        expiration = value
+                    }
 
-                // Error case handling: message will be set
-                key.equals("Message", ignoreCase = true) && stringValue != null -> {
-                    message = stringValue
+                    key.equals("Message", ignoreCase = true) -> {
+                        message = value
+                    }
                 }
-
-                else -> {}
             }
             Result.success(Unit)
         }
 
-    if (parseLoopResult.isFailure) {
-        return Result.failure(parseLoopResult.exceptionOrNull()!!)
+    if (parseResult.isFailure) {
+        return Result.failure(parseResult.exceptionOrNull()!!)
     }
 
-    return when (val codeVal = code) {
-        // IMDS does not appear to reply with a `Code` missing, but documentation indicates it
-        // may be possible
-        null, "Success" -> {
-            val resolvedAccessKeyId = accessKeyId ?: return Result.failure(InvalidJsonCredentials.MissingField("AccessKeyId"))
-            val resolvedSecretAccessKey = secretAccessKey ?: return Result.failure(InvalidJsonCredentials.MissingField("SecretAccessKey"))
-            val resolvedSessionToken = sessionToken ?: return Result.failure(InvalidJsonCredentials.MissingField("Token"))
-            val resolvedExpiration = expiration ?: return Result.failure(InvalidJsonCredentials.MissingField("Expiration"))
+    return when {
+        code == null || code.equals("Success", ignoreCase = true) -> {
+            val resolvedAccessKeyId =
+                accessKeyId
+                    ?: return Result.failure(InvalidJsonCredentials.MissingField("AccessKeyId"))
+            val resolvedSecretAccessKey =
+                secretAccessKey
+                    ?: return Result.failure(InvalidJsonCredentials.MissingField("SecretAccessKey"))
+            val resolvedSessionToken =
+                sessionToken
+                    ?: return Result.failure(InvalidJsonCredentials.MissingField("Token"))
+            val expirationStr =
+                expiration
+                    ?: return Result.failure(InvalidJsonCredentials.MissingField("Expiration"))
+
             val expirationInstant =
                 try {
-                    Instant.parse(resolvedExpiration)
-                } catch (err: IllegalArgumentException) {
-                    return Result.failure(InvalidJsonCredentials.InvalidField("Expiration", err))
+                    Instant.parse(expirationStr)
+                } catch (e: Exception) {
+                    return Result.failure(InvalidJsonCredentials.InvalidField("Expiration", e))
                 }
+
             Result.success(
-                JsonCredentials.RefreshableCredentials(
+                JsonCredentials.Refreshable(
                     RefreshableCredentials(
                         accessKeyId = resolvedAccessKeyId,
                         secretAccessKey = resolvedSecretAccessKey,
@@ -330,7 +201,7 @@ internal fun parseJsonCredentials(
         else -> {
             Result.success(
                 JsonCredentials.Error(
-                    code = codeVal,
+                    code = code,
                     message = message ?: "no message",
                 ),
             )
@@ -340,35 +211,263 @@ internal fun parseJsonCredentials(
 
 internal fun jsonParseLoop(
     input: ByteArray,
-    f: (String, Value) -> Result<Unit>,
+    f: (String, Token) -> Result<Unit>,
 ): Result<Unit> {
-    val jsonString = input.decodeToString()
-    val outcome = fromStr(jsonString)
-    if (outcome.isFailure) {
-        return Result.failure(
-            InvalidJsonCredentials.JsonError(
-                Exception(outcome.exceptionOrNull()?.message ?: "JSON parse error"),
-            ),
-        )
-    }
-    val root = outcome.getOrThrow()
-    if (root !is Value.Object) {
-        return Result.failure(
-            InvalidJsonCredentials.JsonError(
-                IllegalArgumentException("expected a JSON document starting with `{`"),
-            ),
-        )
-    }
-    for ((key, value) in root.value) {
-        val res = f(key, value)
-        if (res.isFailure) {
-            return res
+    val text = input.decodeToString()
+    var i = 0
+    val n = text.length
+
+    fun skipWhitespace() {
+        while (i < n && text[i].isWhitespace()) {
+            i++
         }
     }
-    return Result.success(Unit)
+
+    skipWhitespace()
+    if (i >= n || text[i] != '{') {
+        return Result.failure(
+            InvalidJsonCredentials.JsonError(
+                Exception("expected a JSON document starting with `{`"),
+            ),
+        )
+    }
+    i++ // consume '{'
+
+    fun parseString(): String {
+        val sb = StringBuilder()
+        while (i < n) {
+            val c = text[i++]
+            if (c == '"') {
+                return sb.toString()
+            }
+            if (c == '\\') {
+                if (i >= n) throw IllegalArgumentException("unexpected end of escape in string")
+                when (val esc = text[i++]) {
+                    '"' -> {
+                        sb.append('"')
+                    }
+
+                    '\\' -> {
+                        sb.append('\\')
+                    }
+
+                    '/' -> {
+                        sb.append('/')
+                    }
+
+                    'b' -> {
+                        sb.append('\b')
+                    }
+
+                    'f' -> {
+                        sb.append('\u000c')
+                    }
+
+                    'n' -> {
+                        sb.append('\n')
+                    }
+
+                    'r' -> {
+                        sb.append('\r')
+                    }
+
+                    't' -> {
+                        sb.append('\t')
+                    }
+
+                    'u' -> {
+                        if (i + 4 > n) throw IllegalArgumentException("invalid unicode escape")
+                        val hex = text.substring(i, i + 4)
+                        i += 4
+                        sb.append(hex.toInt(16).toChar())
+                    }
+
+                    else -> {
+                        throw IllegalArgumentException("unknown escape character: $esc")
+                    }
+                }
+            } else {
+                sb.append(c)
+            }
+        }
+        throw IllegalArgumentException("unclosed string literal")
+    }
+
+    fun skipValue() {
+        skipWhitespace()
+        if (i >= n) throw IllegalArgumentException("unexpected end of JSON while skipping value")
+        when (text[i]) {
+            '{' -> {
+                i++
+                var depth = 1
+                var inStr = false
+                while (i < n && depth > 0) {
+                    val ch = text[i++]
+                    if (inStr) {
+                        if (ch == '\\' && i < n) {
+                            i++
+                        } else if (ch == '"') {
+                            inStr = false
+                        }
+                    } else {
+                        if (ch == '"') {
+                            inStr = true
+                        } else if (ch == '{') {
+                            depth++
+                        } else if (ch == '}') {
+                            depth--
+                        }
+                    }
+                }
+                if (depth > 0) throw IllegalArgumentException("unclosed nested object")
+            }
+
+            '[' -> {
+                i++
+                var depth = 1
+                var inStr = false
+                while (i < n && depth > 0) {
+                    val ch = text[i++]
+                    if (inStr) {
+                        if (ch == '\\' && i < n) {
+                            i++
+                        } else if (ch == '"') {
+                            inStr = false
+                        }
+                    } else {
+                        if (ch == '"') {
+                            inStr = true
+                        } else if (ch == '[') {
+                            depth++
+                        } else if (ch == ']') {
+                            depth--
+                        }
+                    }
+                }
+                if (depth > 0) throw IllegalArgumentException("unclosed nested array")
+            }
+
+            '"' -> {
+                i++
+                parseString()
+            }
+
+            else -> {
+                while (i < n && text[i] != ',' && text[i] != '}' && text[i] != ']' && !text[i].isWhitespace()) {
+                    i++
+                }
+            }
+        }
+    }
+
+    try {
+        skipWhitespace()
+        if (i < n && text[i] == '}') {
+            i++ // empty object
+        } else {
+            while (i < n) {
+                skipWhitespace()
+                if (i >= n) {
+                    return Result.failure(
+                        InvalidJsonCredentials.JsonError(Exception("unexpected end of JSON object")),
+                    )
+                }
+                if (text[i] == '}') {
+                    i++
+                    break
+                }
+                if (text[i] != '"') {
+                    return Result.failure(
+                        InvalidJsonCredentials.Other("expected object key, found: ${text[i]}"),
+                    )
+                }
+                i++ // consume '"'
+                val key = parseString()
+                skipWhitespace()
+                if (i >= n || text[i] != ':') {
+                    return Result.failure(
+                        InvalidJsonCredentials.JsonError(Exception("expected ':' after object key")),
+                    )
+                }
+                i++ // consume ':'
+                skipWhitespace()
+                if (i >= n) {
+                    return Result.failure(
+                        InvalidJsonCredentials.JsonError(Exception("unexpected end of JSON after ':'")),
+                    )
+                }
+                val token =
+                    when (text[i]) {
+                        '"' -> {
+                            i++
+                            val strVal = parseString()
+                            Token.ValueString(strVal)
+                        }
+
+                        '{' -> {
+                            Token.StartObject
+                        }
+
+                        '[' -> {
+                            Token.StartArray
+                        }
+
+                        't', 'f' -> {
+                            val isTrue = text.startsWith("true", i)
+                            val isFalse = text.startsWith("false", i)
+                            if (!isTrue && !isFalse) throw IllegalArgumentException("invalid boolean")
+                            Token.ValueBool(isTrue)
+                        }
+
+                        'n' -> {
+                            if (!text.startsWith("null", i)) throw IllegalArgumentException("invalid null")
+                            Token.ValueNull
+                        }
+
+                        else -> {
+                            val sb = StringBuilder()
+                            var j = i
+                            while (j < n && (text[j].isDigit() || text[j] == '.' || text[j] == '-' || text[j] == '+' || text[j] == 'e' || text[j] == 'E')) {
+                                sb.append(text[j++])
+                            }
+                            Token.ValueNumber(sb.toString())
+                        }
+                    }
+                val callbackRes = f(key, token)
+                if (callbackRes.isFailure) {
+                    return callbackRes
+                }
+                if (token !is Token.ValueString) {
+                    skipValue()
+                }
+                skipWhitespace()
+                if (i < n && text[i] == ',') {
+                    i++ // consume ','
+                    skipWhitespace()
+                } else if (i < n && text[i] == '}') {
+                    i++ // consume '}'
+                    break
+                } else {
+                    return Result.failure(
+                        InvalidJsonCredentials.JsonError(Exception("expected ',' or '}'")),
+                    )
+                }
+            }
+        }
+
+        skipWhitespace()
+        if (i < n) {
+            return Result.failure(
+                InvalidJsonCredentials.Other("found more JSON tokens after completing parsing"),
+            )
+        }
+        return Result.success(Unit)
+    } catch (e: IllegalArgumentException) {
+        return Result.failure(InvalidJsonCredentials.JsonError(e))
+    }
 }
 
 internal fun jsonParseLoop(
     input: String,
-    f: (String, Value) -> Result<Unit>,
+    f: (String, Token) -> Result<Unit>,
 ): Result<Unit> = jsonParseLoop(input.encodeToByteArray(), f)
