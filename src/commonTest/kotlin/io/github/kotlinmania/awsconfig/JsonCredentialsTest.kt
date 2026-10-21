@@ -442,4 +442,80 @@ class JsonCredentialsTest {
         assertIs<InvalidJsonCredentials.MissingField>(errKelvin)
         assertEquals("AccessKeyId", errKelvin.field)
     }
+
+    @Test
+    fun plainSuccessReturnsRefreshable() {
+        val response =
+            """
+            {
+              "Code": "Success",
+              "AccessKeyId": "AKIAVALID",
+              "SecretAccessKey": "SECRET",
+              "Token": "TOKEN",
+              "Expiration": "2024-01-01T00:00:00Z"
+            }
+            """.trimIndent()
+        val parsed = parseJsonCredentials(response).getOrThrow()
+        assertIs<JsonCredentials.Refreshable>(parsed)
+        assertEquals("AKIAVALID", parsed.credentials.accessKeyId)
+    }
+
+    @Test
+    fun escapedSuccessCodeReturnsErrorVariant() {
+        // Pinned aws-smithy-json:0.61.8 escape.rs:96-104 produces Cow::Owned for escaped strings.
+        // Pinned aws-config json_credentials.rs:182 matches only None | Some(Cow::Borrowed("Success")).
+        // An escaped "\u0053uccess" produces Cow::Owned("Success") and takes the Error variant.
+        val response =
+            """
+            {
+              "Code": "\u0053uccess",
+              "AccessKeyId": "AKIAVALID",
+              "SecretAccessKey": "SECRET",
+              "Token": "TOKEN",
+              "Expiration": "2024-01-01T00:00:00Z"
+            }
+            """.trimIndent()
+        val parsed = parseJsonCredentials(response).getOrThrow()
+        assertIs<JsonCredentials.Error>(parsed)
+        assertEquals("Success", parsed.code)
+        assertEquals("no message", parsed.message)
+    }
+
+    @Test
+    fun escapedCodeKeyReturnsRefreshable() {
+        // Escaped keys are unescaped by token iteration and matched case-insensitively.
+        val response =
+            """
+            {
+              "\u0043ode": "Success",
+              "AccessKeyId": "AKIAVALID",
+              "SecretAccessKey": "SECRET",
+              "Token": "TOKEN",
+              "Expiration": "2024-01-01T00:00:00Z"
+            }
+            """.trimIndent()
+        val parsed = parseJsonCredentials(response).getOrThrow()
+        assertIs<JsonCredentials.Refreshable>(parsed)
+        assertEquals("AKIAVALID", parsed.credentials.accessKeyId)
+    }
+
+    @Test
+    fun ordinaryEscapedFieldValuesUnescaped() {
+        // Ordinary credential fields are unescaped into owned strings.
+        val response =
+            """
+            {
+              "Code": "Success",
+              "AccessKeyId": "\u0041SIARTEST",
+              "SecretAccessKey": "xj\u0074est",
+              "Token": "tok\u0065n",
+              "Expiration": "2024-01-01T00:00:00Z"
+            }
+            """.trimIndent()
+        val parsed = parseJsonCredentials(response).getOrThrow()
+        assertIs<JsonCredentials.Refreshable>(parsed)
+        assertEquals("ASIARTEST", parsed.credentials.accessKeyId)
+        assertEquals("xjtest", parsed.credentials.secretAccessKey)
+        assertEquals("token", parsed.credentials.sessionToken)
+    }
 }

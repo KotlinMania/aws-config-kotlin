@@ -83,6 +83,7 @@ internal sealed class Token {
 
     internal data class ValueString(
         val value: String,
+        val wasEscaped: Boolean = false,
     ) : Token()
 
     internal data class ValueNumber(
@@ -115,6 +116,7 @@ internal fun parseJsonCredentials(credentialsResponse: String): Result<JsonCrede
 
 internal fun parseJsonCredentials(credentialsResponse: ByteArray): Result<JsonCredentials> {
     var code: String? = null
+    var codeWasEscaped = false
     var accessKeyId: String? = null
     var secretAccessKey: String? = null
     var sessionToken: String? = null
@@ -129,6 +131,7 @@ internal fun parseJsonCredentials(credentialsResponse: ByteArray): Result<JsonCr
                 when {
                     key.eqIgnoreAsciiCase("Code") -> {
                         code = value
+                        codeWasEscaped = token.wasEscaped
                     }
 
                     key.eqIgnoreAsciiCase("AccessKeyId") -> {
@@ -164,7 +167,7 @@ internal fun parseJsonCredentials(credentialsResponse: ByteArray): Result<JsonCr
     }
 
     return when {
-        code == null || code == "Success" -> {
+        code == null || (code == "Success" && !codeWasEscaped) -> {
             val resolvedAccessKeyId =
                 accessKeyId
                     ?: return Result.failure(InvalidJsonCredentials.MissingField("AccessKeyId"))
@@ -221,6 +224,11 @@ private fun String.eqIgnoreAsciiCase(other: String): Boolean {
     }
     return true
 }
+
+private data class ParsedString(
+    val value: String,
+    val wasEscaped: Boolean,
+)
 
 private fun validateAndDecodeUtf8(bytes: ByteArray): String {
     var i = 0
@@ -314,17 +322,19 @@ internal fun jsonParseLoop(
         return value
     }
 
-    fun parseString(): String {
+    fun parseString(): ParsedString {
         val sb = StringBuilder()
+        var wasEscaped = false
         while (i < n) {
             val c = text[i++]
             if (c == '"') {
-                return sb.toString()
+                return ParsedString(sb.toString(), wasEscaped)
             }
             if (c.code < 0x20) {
                 throw IllegalArgumentException("unescaped control character in string: ${c.code}")
             }
             if (c == '\\') {
+                wasEscaped = true
                 if (i >= n) throw IllegalArgumentException("unexpected end of escape in string")
                 when (val esc = text[i++]) {
                     '"' -> {
@@ -562,7 +572,7 @@ internal fun jsonParseLoop(
                     )
                 }
                 i++ // consume '"'
-                val key = parseString()
+                val key = parseString().value
                 skipWhitespace()
                 if (i >= n || text[i] != ':') {
                     return Result.failure(
@@ -580,8 +590,8 @@ internal fun jsonParseLoop(
                     when (text[i]) {
                         '"' -> {
                             i++
-                            val strVal = parseString()
-                            Token.ValueString(strVal)
+                            val parsedStr = parseString()
+                            Token.ValueString(parsedStr.value, parsedStr.wasEscaped)
                         }
 
                         '{' -> {
