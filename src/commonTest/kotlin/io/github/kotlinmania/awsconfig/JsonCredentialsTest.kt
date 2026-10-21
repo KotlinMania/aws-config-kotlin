@@ -1,4 +1,4 @@
-// port-lint: source json_credentials.rs
+// port-lint: tests json_credentials.rs
 package io.github.kotlinmania.awsconfig
 
 import kotlin.test.Test
@@ -173,5 +173,43 @@ class JsonCredentialsTest {
             ),
             parsed,
         )
+    }
+
+    @Test
+    fun refreshableCredentialsSerdeSerializeAndDeserialize() {
+        val creds =
+            RefreshableCredentials(
+                accessKeyId = "AKIAIOSFODNN7EXAMPLE",
+                secretAccessKey = "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
+                sessionToken = "tokenExample",
+                accountId = "123456789012",
+                expiration = Instant.fromEpochSeconds(1_700_000_000),
+            )
+        val jsonOutput =
+            io.github.kotlinmania.serdejson
+                .toStr(creds)
+                .getOrThrow()
+        assertTrue(jsonOutput.contains("accessKeyId"))
+        assertTrue(jsonOutput.contains("** redacted **"))
+
+        val deserialized =
+            io.github.kotlinmania.serdejson
+                .fromStr(
+                    """
+                    {
+                      "AccessKeyId": "AKIAIOSFODNN7EXAMPLE",
+                      "SecretAccessKey": "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
+                      "SessionToken": "tokenExample",
+                      "AccountId": "123456789012",
+                      "Expiration": "2023-11-14T22:13:20Z"
+                    }
+                    """.trimIndent(),
+                    RefreshableCredentials,
+                ).getOrThrow()
+        assertEquals("AKIAIOSFODNN7EXAMPLE", deserialized.accessKeyId)
+        assertEquals("wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY", deserialized.secretAccessKey)
+        assertEquals("tokenExample", deserialized.sessionToken)
+        assertEquals("123456789012", deserialized.accountId)
+        assertEquals(Instant.fromEpochSeconds(1_700_000_000), deserialized.expiration)
     }
 }
