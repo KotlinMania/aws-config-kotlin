@@ -386,4 +386,60 @@ class JsonCredentialsTest {
         assertIs<JsonCredentials.Error>(parsed)
         assertEquals("\uD83D\uDE00", parsed.code)
     }
+
+    @Test
+    fun unicodeDigitsInNumbersRejected() {
+        val nonAsciiInteger = "{\"Code\": \"Failure\", \"extra\": 1\u0661}"
+        assertIs<InvalidJsonCredentials.JsonError>(parseJsonCredentials(nonAsciiInteger).exceptionOrNull())
+
+        val nonAsciiFraction = "{\"Code\": \"Failure\", \"extra\": 1.\u0661}"
+        assertIs<InvalidJsonCredentials.JsonError>(parseJsonCredentials(nonAsciiFraction).exceptionOrNull())
+
+        val nonAsciiExponent = "{\"Code\": \"Failure\", \"extra\": 1e\u0661}"
+        assertIs<InvalidJsonCredentials.JsonError>(parseJsonCredentials(nonAsciiExponent).exceptionOrNull())
+    }
+
+    @Test
+    fun unicodeEscapesSignedAndNonAsciiHexRejected() {
+        val signedPlusEscape = "{\"Code\": \"\\u+041\"}"
+        assertIs<InvalidJsonCredentials.JsonError>(parseJsonCredentials(signedPlusEscape).exceptionOrNull())
+
+        val signedMinusEscape = "{\"Code\": \"\\u-001\"}"
+        assertIs<InvalidJsonCredentials.JsonError>(parseJsonCredentials(signedMinusEscape).exceptionOrNull())
+
+        val nonAsciiHexEscape = "{\"Code\": \"\\u\u0661000\"}"
+        assertIs<InvalidJsonCredentials.JsonError>(parseJsonCredentials(nonAsciiHexEscape).exceptionOrNull())
+
+        val invalidHexCharEscape = "{\"Code\": \"\\u004G\"}"
+        assertIs<InvalidJsonCredentials.JsonError>(parseJsonCredentials(invalidHexCharEscape).exceptionOrNull())
+    }
+
+    @Test
+    fun asciiOnlyKeyComparison() {
+        val validAsciiLowercase =
+            """
+            {
+              "accesskeyid": "AKIAVALID",
+              "secretaccesskey": "SECRETDATA",
+              "token": "TOKENDATA",
+              "expiration": "2024-01-01T00:00:00Z"
+            }
+            """.trimIndent()
+        val parsedValid = parseJsonCredentials(validAsciiLowercase).getOrThrow()
+        assertIs<JsonCredentials.Refreshable>(parsedValid)
+        assertEquals("AKIAVALID", parsedValid.credentials.accessKeyId)
+
+        val kelvinSignKey =
+            """
+            {
+              "Access\u212AeyId": "AKIAKELVIN",
+              "SecretAccessKey": "SECRETDATA",
+              "Token": "TOKENDATA",
+              "Expiration": "2024-01-01T00:00:00Z"
+            }
+            """.trimIndent()
+        val errKelvin = parseJsonCredentials(kelvinSignKey).exceptionOrNull()
+        assertIs<InvalidJsonCredentials.MissingField>(errKelvin)
+        assertEquals("AccessKeyId", errKelvin.field)
+    }
 }

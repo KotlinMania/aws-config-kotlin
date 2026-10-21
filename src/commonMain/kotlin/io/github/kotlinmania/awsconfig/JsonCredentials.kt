@@ -127,31 +127,31 @@ internal fun parseJsonCredentials(credentialsResponse: ByteArray): Result<JsonCr
             if (token is Token.ValueString) {
                 val value = token.value
                 when {
-                    key.equals("Code", ignoreCase = true) -> {
+                    key.eqIgnoreAsciiCase("Code") -> {
                         code = value
                     }
 
-                    key.equals("AccessKeyId", ignoreCase = true) -> {
+                    key.eqIgnoreAsciiCase("AccessKeyId") -> {
                         accessKeyId = value
                     }
 
-                    key.equals("SecretAccessKey", ignoreCase = true) -> {
+                    key.eqIgnoreAsciiCase("SecretAccessKey") -> {
                         secretAccessKey = value
                     }
 
-                    key.equals("Token", ignoreCase = true) || key.equals("SessionToken", ignoreCase = true) -> {
+                    key.eqIgnoreAsciiCase("Token") || key.eqIgnoreAsciiCase("SessionToken") -> {
                         sessionToken = value
                     }
 
-                    key.equals("AccountId", ignoreCase = true) -> {
+                    key.eqIgnoreAsciiCase("AccountId") -> {
                         accountId = value
                     }
 
-                    key.equals("Expiration", ignoreCase = true) || key.equals("ExpiresAt", ignoreCase = true) -> {
+                    key.eqIgnoreAsciiCase("Expiration") || key.eqIgnoreAsciiCase("ExpiresAt") -> {
                         expiration = value
                     }
 
-                    key.equals("Message", ignoreCase = true) -> {
+                    key.eqIgnoreAsciiCase("Message") -> {
                         message = value
                     }
                 }
@@ -207,6 +207,19 @@ internal fun parseJsonCredentials(credentialsResponse: ByteArray): Result<JsonCr
             )
         }
     }
+}
+
+private fun String.eqIgnoreAsciiCase(other: String): Boolean {
+    if (this.length != other.length) return false
+    for (i in indices) {
+        val c1 = this[i]
+        val c2 = other[i]
+        if (c1 == c2) continue
+        val lower1 = if (c1 in 'A'..'Z') c1 + 32 else c1
+        val lower2 = if (c2 in 'A'..'Z') c2 + 32 else c2
+        if (lower1 != lower2) return false
+    }
+    return true
 }
 
 private fun validateAndDecodeUtf8(bytes: ByteArray): String {
@@ -284,6 +297,23 @@ internal fun jsonParseLoop(
         }
     }
 
+    fun parseAsciiHex4(): Int {
+        if (i + 4 > n) throw IllegalArgumentException("invalid unicode escape: truncated")
+        var value = 0
+        for (idx in 0 until 4) {
+            val c = text[i++]
+            val digit =
+                when (c) {
+                    in '0'..'9' -> c - '0'
+                    in 'a'..'f' -> c - 'a' + 10
+                    in 'A'..'F' -> c - 'A' + 10
+                    else -> throw IllegalArgumentException("invalid hex character in unicode escape: '$c'")
+                }
+            value = (value shl 4) or digit
+        }
+        return value
+    }
+
     fun parseString(): String {
         val sb = StringBuilder()
         while (i < n) {
@@ -331,18 +361,14 @@ internal fun jsonParseLoop(
 
                     'u' -> {
                         if (i + 4 > n) throw IllegalArgumentException("invalid unicode escape")
-                        val hex = text.substring(i, i + 4)
-                        i += 4
-                        val codeUnit = hex.toIntOrNull(16) ?: throw IllegalArgumentException("invalid hex in unicode escape: $hex")
+                        val codeUnit = parseAsciiHex4()
                         if (codeUnit in 0xD800..0xDBFF) {
                             // High surrogate, must be followed by \uXXXX low surrogate
                             if (i + 6 > n || text[i] != '\\' || text[i + 1] != 'u') {
                                 throw IllegalArgumentException("unpaired high surrogate")
                             }
                             i += 2 // skip \u
-                            val lowHex = text.substring(i, i + 4)
-                            i += 4
-                            val lowUnit = lowHex.toIntOrNull(16) ?: throw IllegalArgumentException("invalid low surrogate hex: $lowHex")
+                            val lowUnit = parseAsciiHex4()
                             if (lowUnit !in 0xDC00..0xDFFF) {
                                 throw IllegalArgumentException("invalid low surrogate code unit: $lowUnit")
                             }
@@ -374,11 +400,11 @@ internal fun jsonParseLoop(
         if (i >= n) throw IllegalArgumentException("expected digit after '-' in number")
         if (text[i] == '0') {
             i++
-            if (i < n && text[i].isDigit()) {
+            if (i < n && text[i] in '0'..'9') {
                 throw IllegalArgumentException("leading zeros are not permitted in JSON numbers")
             }
         } else if (text[i] in '1'..'9') {
-            while (i < n && text[i].isDigit()) {
+            while (i < n && text[i] in '0'..'9') {
                 i++
             }
         } else {
@@ -386,10 +412,10 @@ internal fun jsonParseLoop(
         }
         if (i < n && text[i] == '.') {
             i++
-            if (i >= n || !text[i].isDigit()) {
+            if (i >= n || text[i] !in '0'..'9') {
                 throw IllegalArgumentException("expected digit after '.' in number")
             }
-            while (i < n && text[i].isDigit()) {
+            while (i < n && text[i] in '0'..'9') {
                 i++
             }
         }
@@ -398,10 +424,10 @@ internal fun jsonParseLoop(
             if (i < n && (text[i] == '+' || text[i] == '-')) {
                 i++
             }
-            if (i >= n || !text[i].isDigit()) {
+            if (i >= n || text[i] !in '0'..'9') {
                 throw IllegalArgumentException("expected digit after exponent in number")
             }
-            while (i < n && text[i].isDigit()) {
+            while (i < n && text[i] in '0'..'9') {
                 i++
             }
         }
