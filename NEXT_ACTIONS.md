@@ -4,14 +4,14 @@ Based on AST analysis, here are the concrete next steps.
 
 ## Summary
 
-- **Files Present:** 6/63 (9.5%)
-- **Function parity:** 26/673 matched (target 52) — 3.9%
-- **Class/type parity:** 12/159 matched (target 43) — 7.5%
-- **Combined symbol parity:** 38/832 matched (target 95) — 4.6%
+- **Files Present:** 5/62 (8.1%)
+- **Function parity:** 20/666 matched (target 46) — 3.0%
+- **Class/type parity:** 9/156 matched (target 39) — 5.8%
+- **Combined symbol parity:** 29/822 matched (target 85) — 3.5%
 - **Average inline-code cosine:** 0.11 (function body across 5 matched files)
 - **Average documentation cosine:** 0.37 (doc text across 5 matched files)
-- **Cheat-zeroed Files:** 1
-- **Critical Issues:** 6 files with <0.60 function similarity
+- **Cheat-zeroed Files:** 0
+- **Critical Issues:** 5 files with <0.60 function similarity
 - **Needs Review:** 0 files with 0.60-0.84 function similarity
 - **Excellent:** 0 files with >=0.85 function similarity
 
@@ -24,15 +24,15 @@ No incomplete high-dependency files detected.
 Critical missing files (>10 dependencies):
 
 1. **provider_config** (28 deps)
-   - Path: `src/provider_config.rs`
+   - Path: `provider_config.rs`
    - Essential for 28 other files
 
 2. **sso.credentials** (12 deps)
-   - Path: `src/sso/credentials.rs`
+   - Path: `sso/credentials.rs`
    - Essential for 12 other files
 
 3. **imds.region** (11 deps)
-   - Path: `src/imds/region.rs`
+   - Path: `imds/region.rs`
    - Essential for 11 other files
 
 ## Detailed Work Items
@@ -69,7 +69,7 @@ Every matched file is listed below with function and type symbol parity.
 - **Similarity:** 0.15
 - **Dependents:** 0
 - **Priority Score:** 21808.5
-- **Functions:** 13/15 matched (target 26)
+- **Functions:** 13/15 matched (target 32)
 - **Missing functions:** `from`, `fmt`
 - **Types:** 3/3 matched (target 20)
 - **Missing types:** _none_
@@ -92,20 +92,9 @@ Every matched file is listed below with function and type symbol parity.
 - **Similarity:** 0.19
 - **Dependents:** 0
 - **Priority Score:** 20508.1
-- **Functions:** 1/3 matched (target 7)
+- **Functions:** 1/3 matched (target 4)
 - **Missing functions:** `fmt`, `source`
 - **Types:** 2/2 matched (target 5)
-- **Missing types:** _none_
-
-### 6. environment.mod
-
-- **Target:** `environment.Mod [STUB]`
-- **Similarity:** 0.00
-- **Dependents:** 0
-- **Priority Score:** 910.0
-- **Functions:** 6/6 matched (target 9)
-- **Missing functions:** _none_
-- **Types:** 3/3 matched (target 4)
 - **Missing types:** _none_
 
 ## Success Criteria
@@ -128,8 +117,9 @@ do not treat them as the next implementation target by default.
 
 | Source | Expected target | Deps | Source path | Expected path |
 |--------|-----------------|------|-------------|---------------|
-| `imds.mod` | `imds.Mod` | 0 | `src/imds/mod.rs` | `imds/Mod.kt` |
-| `lib` | `Lib` | 0 | `src/lib.rs` | `Lib.kt` |
-| `credentials.mod` | `meta.credentials.Mod` | 0 | `src/meta/credentials/mod.rs` | `meta/credentials/Mod.kt` |
-| `meta.mod` | `meta.Mod` | 0 | `src/meta/mod.rs` | `meta/Mod.kt` |
+| `environment.mod` | `environment.Mod` | 0 | `environment/mod.rs` | `environment/Mod.kt` |
+| `imds.mod` | `imds.Mod` | 0 | `imds/mod.rs` | `imds/Mod.kt` |
+| `lib` | `Lib` | 0 | `lib.rs` | `Lib.kt` |
+| `credentials.mod` | `meta.credentials.Mod` | 0 | `meta/credentials/mod.rs` | `meta/credentials/Mod.kt` |
+| `meta.mod` | `meta.Mod` | 0 | `meta/mod.rs` | `meta/Mod.kt` |
 

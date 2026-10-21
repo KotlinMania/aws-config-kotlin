@@ -1,4 +1,3 @@
-// port-lint: source environment/mod.rs
 package io.github.kotlinmania.awsconfig.environment
 
 internal class InvalidBooleanValue(

@@ -290,4 +290,100 @@ class JsonCredentialsTest {
         assertTrue(!debugString.contains("SESSION_TOKEN_NOT_LEAKED"))
         assertTrue(debugString.contains("account_id: \"123456789012\""))
     }
+
+    @Test
+    fun caseSensitiveCodeValue() {
+        val response =
+            """
+            {
+              "Code": "success",
+              "Message": "lowercase success is not an ok status"
+            }
+            """.trimIndent()
+        val parsed = parseJsonCredentials(response).getOrThrow()
+        assertEquals(
+            JsonCredentials.Error(
+                code = "success",
+                message = "lowercase success is not an ok status",
+            ),
+            parsed,
+        )
+    }
+
+    @Test
+    fun trailingCommaRejected() {
+        val trailingCommaObject = """{"Code": "Failure",}"""
+        val err1 = parseJsonCredentials(trailingCommaObject).exceptionOrNull()
+        assertIs<InvalidJsonCredentials.JsonError>(err1)
+
+        val trailingCommaAtEof = """{"Code": "Failure","""
+        val err2 = parseJsonCredentials(trailingCommaAtEof).exceptionOrNull()
+        assertIs<InvalidJsonCredentials.JsonError>(err2)
+
+        val trailingCommaNested =
+            """
+            {
+              "Code": "Success",
+              "AccessKeyId": "K",
+              "SecretAccessKey": "S",
+              "Token": "T",
+              "Expiration": "2024-01-01T00:00:00Z",
+              "nested": {"key": "val",}
+            }
+            """.trimIndent()
+        val err3 = parseJsonCredentials(trailingCommaNested).exceptionOrNull()
+        assertIs<InvalidJsonCredentials.JsonError>(err3)
+
+        val trailingCommaArray =
+            """
+            {
+              "Code": "Success",
+              "AccessKeyId": "K",
+              "SecretAccessKey": "S",
+              "Token": "T",
+              "Expiration": "2024-01-01T00:00:00Z",
+              "items": [1, 2,]
+            }
+            """.trimIndent()
+        val err4 = parseJsonCredentials(trailingCommaArray).exceptionOrNull()
+        assertIs<InvalidJsonCredentials.JsonError>(err4)
+    }
+
+    @Test
+    fun invalidLiteralsAndNumbersRejected() {
+        val invalidLiteral = """{"Code": "Failure", "extra": nonsense}"""
+        assertIs<InvalidJsonCredentials.JsonError>(parseJsonCredentials(invalidLiteral).exceptionOrNull())
+
+        val leadingZeroNumber = """{"Code": "Failure", "num": 01}"""
+        assertIs<InvalidJsonCredentials.JsonError>(parseJsonCredentials(leadingZeroNumber).exceptionOrNull())
+
+        val leadingPlusNumber = """{"Code": "Failure", "num": +1}"""
+        assertIs<InvalidJsonCredentials.JsonError>(parseJsonCredentials(leadingPlusNumber).exceptionOrNull())
+
+        val loneTrailingDotNumber = """{"Code": "Failure", "num": 1.}"""
+        assertIs<InvalidJsonCredentials.JsonError>(parseJsonCredentials(loneTrailingDotNumber).exceptionOrNull())
+
+        val noLeadingDigitFraction = """{"Code": "Failure", "num": .5}"""
+        assertIs<InvalidJsonCredentials.JsonError>(parseJsonCredentials(noLeadingDigitFraction).exceptionOrNull())
+    }
+
+    @Test
+    fun strictUtf8AndSurrogatesValidation() {
+        val invalidUtf8Bytes = byteArrayOf('{'.code.toByte(), '"'.code.toByte(), 0xC2.toByte(), '}'.code.toByte())
+        val utf8Err = jsonParseLoop(invalidUtf8Bytes) { _, _ -> Result.success(Unit) }.exceptionOrNull()
+        assertIs<InvalidJsonCredentials.JsonError>(utf8Err)
+
+        val unescapedControlChar = "{\"Code\": \"Fail\u0000ure\"}"
+        val ctrlErr = parseJsonCredentials(unescapedControlChar).exceptionOrNull()
+        assertIs<InvalidJsonCredentials.JsonError>(ctrlErr)
+
+        val loneSurrogate = "{\"Code\": \"\\uD800\"}"
+        val surrogateErr = parseJsonCredentials(loneSurrogate).exceptionOrNull()
+        assertIs<InvalidJsonCredentials.JsonError>(surrogateErr)
+
+        val validSurrogatePair = "{\"Code\": \"\\uD83D\\uDE00\", \"Message\": \"smile\"}"
+        val parsed = parseJsonCredentials(validSurrogatePair).getOrThrow()
+        assertIs<JsonCredentials.Error>(parsed)
+        assertEquals("\uD83D\uDE00", parsed.code)
+    }
 }

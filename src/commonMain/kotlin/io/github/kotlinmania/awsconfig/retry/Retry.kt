@@ -32,16 +32,8 @@ class RetryConfigError internal constructor(
 ) : Exception(messageFor(kind), sourceFor(kind)) {
     fun errorDescription(): String = message ?: "RetryConfigError"
 
-    companion object {
+    internal companion object {
         internal fun from(kind: RetryConfigErrorKind): RetryConfigError = RetryConfigError(kind)
-
-        fun maxAttemptsMustNotBeZero(): RetryConfigError = RetryConfigError(RetryConfigErrorKind.MaxAttemptsMustNotBeZero)
-
-        fun invalidRetryMode(message: String): RetryConfigError =
-            RetryConfigError(RetryConfigErrorKind.InvalidRetryMode(Exception(message)))
-
-        fun failedToParseMaxAttempts(message: String): RetryConfigError =
-            RetryConfigError(RetryConfigErrorKind.FailedToParseMaxAttempts(Exception(message)))
 
         private fun messageFor(kind: RetryConfigErrorKind): String =
             when (kind) {

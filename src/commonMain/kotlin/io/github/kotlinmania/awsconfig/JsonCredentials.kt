@@ -164,7 +164,7 @@ internal fun parseJsonCredentials(credentialsResponse: ByteArray): Result<JsonCr
     }
 
     return when {
-        code == null || code.equals("Success", ignoreCase = true) -> {
+        code == null || code == "Success" -> {
             val resolvedAccessKeyId =
                 accessKeyId
                     ?: return Result.failure(InvalidJsonCredentials.MissingField("AccessKeyId"))
@@ -209,29 +209,80 @@ internal fun parseJsonCredentials(credentialsResponse: ByteArray): Result<JsonCr
     }
 }
 
+private fun validateAndDecodeUtf8(bytes: ByteArray): String {
+    var i = 0
+    val n = bytes.size
+    val sb = StringBuilder(n)
+    while (i < n) {
+        val b0 = bytes[i++].toInt() and 0xFF
+        when {
+            b0 < 0x80 -> {
+                sb.append(b0.toChar())
+            }
+
+            b0 in 0xC2..0xDF -> {
+                if (i >= n) throw IllegalArgumentException("truncated UTF-8 sequence")
+                val b1 = bytes[i++].toInt() and 0xFF
+                if (b1 !in 0x80..0xBF) throw IllegalArgumentException("invalid UTF-8 continuation byte")
+                val cp = ((b0 and 0x1F) shl 6) or (b1 and 0x3F)
+                sb.append(cp.toChar())
+            }
+
+            b0 in 0xE0..0xEF -> {
+                if (i + 1 >= n) throw IllegalArgumentException("truncated UTF-8 sequence")
+                val b1 = bytes[i++].toInt() and 0xFF
+                val b2 = bytes[i++].toInt() and 0xFF
+                if (b1 !in 0x80..0xBF || b2 !in 0x80..0xBF) throw IllegalArgumentException("invalid UTF-8 continuation byte")
+                if (b0 == 0xE0 && b1 < 0xA0) throw IllegalArgumentException("overlong UTF-8 sequence")
+                if (b0 == 0xED && b1 >= 0xA0) throw IllegalArgumentException("UTF-8 encoding of surrogate code point")
+                val cp = ((b0 and 0x0F) shl 12) or ((b1 and 0x3F) shl 6) or (b2 and 0x3F)
+                sb.append(cp.toChar())
+            }
+
+            b0 in 0xF0..0xF4 -> {
+                if (i + 2 >= n) throw IllegalArgumentException("truncated UTF-8 sequence")
+                val b1 = bytes[i++].toInt() and 0xFF
+                val b2 = bytes[i++].toInt() and 0xFF
+                val b3 = bytes[i++].toInt() and 0xFF
+                if (b1 !in 0x80..0xBF || b2 !in 0x80..0xBF || b3 !in 0x80..0xBF) {
+                    throw IllegalArgumentException("invalid UTF-8 continuation byte")
+                }
+                if (b0 == 0xF0 && b1 < 0x90) throw IllegalArgumentException("overlong UTF-8 sequence")
+                if (b0 == 0xF4 && b1 > 0x8F) throw IllegalArgumentException("UTF-8 code point out of range")
+                val cp = ((b0 and 0x07) shl 18) or ((b1 and 0x3F) shl 12) or ((b2 and 0x3F) shl 6) or (b3 and 0x3F)
+                if (cp > 0x10FFFF) throw IllegalArgumentException("code point out of range")
+                val high = (((cp - 0x10000) ushr 10) + 0xD800).toChar()
+                val low = (((cp - 0x10000) and 0x3FF) + 0xDC00).toChar()
+                sb.append(high).append(low)
+            }
+
+            else -> {
+                throw IllegalArgumentException("invalid UTF-8 lead byte: $b0")
+            }
+        }
+    }
+    return sb.toString()
+}
+
 internal fun jsonParseLoop(
     input: ByteArray,
     f: (String, Token) -> Result<Unit>,
 ): Result<Unit> {
-    val text = input.decodeToString()
+    val text: String
+    try {
+        text = validateAndDecodeUtf8(input)
+    } catch (e: IllegalArgumentException) {
+        return Result.failure(InvalidJsonCredentials.JsonError(e))
+    }
+
     var i = 0
     val n = text.length
 
     fun skipWhitespace() {
-        while (i < n && text[i].isWhitespace()) {
+        while (i < n && (text[i] == ' ' || text[i] == '\t' || text[i] == '\n' || text[i] == '\r')) {
             i++
         }
     }
-
-    skipWhitespace()
-    if (i >= n || text[i] != '{') {
-        return Result.failure(
-            InvalidJsonCredentials.JsonError(
-                Exception("expected a JSON document starting with `{`"),
-            ),
-        )
-    }
-    i++ // consume '{'
 
     fun parseString(): String {
         val sb = StringBuilder()
@@ -239,6 +290,9 @@ internal fun jsonParseLoop(
             val c = text[i++]
             if (c == '"') {
                 return sb.toString()
+            }
+            if (c.code < 0x20) {
+                throw IllegalArgumentException("unescaped control character in string: ${c.code}")
             }
             if (c == '\\') {
                 if (i >= n) throw IllegalArgumentException("unexpected end of escape in string")
@@ -279,7 +333,26 @@ internal fun jsonParseLoop(
                         if (i + 4 > n) throw IllegalArgumentException("invalid unicode escape")
                         val hex = text.substring(i, i + 4)
                         i += 4
-                        sb.append(hex.toInt(16).toChar())
+                        val codeUnit = hex.toIntOrNull(16) ?: throw IllegalArgumentException("invalid hex in unicode escape: $hex")
+                        if (codeUnit in 0xD800..0xDBFF) {
+                            // High surrogate, must be followed by \uXXXX low surrogate
+                            if (i + 6 > n || text[i] != '\\' || text[i + 1] != 'u') {
+                                throw IllegalArgumentException("unpaired high surrogate")
+                            }
+                            i += 2 // skip \u
+                            val lowHex = text.substring(i, i + 4)
+                            i += 4
+                            val lowUnit = lowHex.toIntOrNull(16) ?: throw IllegalArgumentException("invalid low surrogate hex: $lowHex")
+                            if (lowUnit !in 0xDC00..0xDFFF) {
+                                throw IllegalArgumentException("invalid low surrogate code unit: $lowUnit")
+                            }
+                            sb.append(codeUnit.toChar())
+                            sb.append(lowUnit.toChar())
+                        } else if (codeUnit in 0xDC00..0xDFFF) {
+                            throw IllegalArgumentException("unpaired low surrogate")
+                        } else {
+                            sb.append(codeUnit.toChar())
+                        }
                     }
 
                     else -> {
@@ -293,88 +366,169 @@ internal fun jsonParseLoop(
         throw IllegalArgumentException("unclosed string literal")
     }
 
+    fun parseNumber(): String {
+        val start = i
+        if (i < n && text[i] == '-') {
+            i++
+        }
+        if (i >= n) throw IllegalArgumentException("expected digit after '-' in number")
+        if (text[i] == '0') {
+            i++
+            if (i < n && text[i].isDigit()) {
+                throw IllegalArgumentException("leading zeros are not permitted in JSON numbers")
+            }
+        } else if (text[i] in '1'..'9') {
+            while (i < n && text[i].isDigit()) {
+                i++
+            }
+        } else {
+            throw IllegalArgumentException("expected digit in number, found: ${text[i]}")
+        }
+        if (i < n && text[i] == '.') {
+            i++
+            if (i >= n || !text[i].isDigit()) {
+                throw IllegalArgumentException("expected digit after '.' in number")
+            }
+            while (i < n && text[i].isDigit()) {
+                i++
+            }
+        }
+        if (i < n && (text[i] == 'e' || text[i] == 'E')) {
+            i++
+            if (i < n && (text[i] == '+' || text[i] == '-')) {
+                i++
+            }
+            if (i >= n || !text[i].isDigit()) {
+                throw IllegalArgumentException("expected digit after exponent in number")
+            }
+            while (i < n && text[i].isDigit()) {
+                i++
+            }
+        }
+        return text.substring(start, i)
+    }
+
     fun skipValue() {
         skipWhitespace()
-        if (i >= n) throw IllegalArgumentException("unexpected end of JSON while skipping value")
+        if (i >= n) throw IllegalArgumentException("unexpected end of JSON while parsing value")
         when (text[i]) {
-            '{' -> {
-                i++
-                var depth = 1
-                var inStr = false
-                while (i < n && depth > 0) {
-                    val ch = text[i++]
-                    if (inStr) {
-                        if (ch == '\\' && i < n) {
-                            i++
-                        } else if (ch == '"') {
-                            inStr = false
-                        }
-                    } else {
-                        if (ch == '"') {
-                            inStr = true
-                        } else if (ch == '{') {
-                            depth++
-                        } else if (ch == '}') {
-                            depth--
-                        }
-                    }
-                }
-                if (depth > 0) throw IllegalArgumentException("unclosed nested object")
-            }
-
-            '[' -> {
-                i++
-                var depth = 1
-                var inStr = false
-                while (i < n && depth > 0) {
-                    val ch = text[i++]
-                    if (inStr) {
-                        if (ch == '\\' && i < n) {
-                            i++
-                        } else if (ch == '"') {
-                            inStr = false
-                        }
-                    } else {
-                        if (ch == '"') {
-                            inStr = true
-                        } else if (ch == '[') {
-                            depth++
-                        } else if (ch == ']') {
-                            depth--
-                        }
-                    }
-                }
-                if (depth > 0) throw IllegalArgumentException("unclosed nested array")
-            }
-
             '"' -> {
                 i++
                 parseString()
             }
 
-            else -> {
-                while (i < n && text[i] != ',' && text[i] != '}' && text[i] != ']' && !text[i].isWhitespace()) {
-                    i++
+            '{' -> {
+                i++ // consume '{'
+                skipWhitespace()
+                if (i < n && text[i] == '}') {
+                    i++ // empty object
+                } else {
+                    while (true) {
+                        skipWhitespace()
+                        if (i >= n) throw IllegalArgumentException("unexpected end of JSON in nested object")
+                        if (text[i] != '"') throw IllegalArgumentException("expected string key in nested object")
+                        i++ // consume '"'
+                        parseString()
+                        skipWhitespace()
+                        if (i >= n || text[i] != ':') throw IllegalArgumentException("expected ':' in nested object")
+                        i++ // consume ':'
+                        skipValue()
+                        skipWhitespace()
+                        if (i < n && text[i] == ',') {
+                            i++
+                            skipWhitespace()
+                            if (i < n && text[i] == '}') {
+                                throw IllegalArgumentException("trailing comma before '}' in nested object")
+                            }
+                        } else if (i < n && text[i] == '}') {
+                            i++
+                            break
+                        } else {
+                            throw IllegalArgumentException("expected ',' or '}' in nested object")
+                        }
+                    }
                 }
+            }
+
+            '[' -> {
+                i++ // consume '['
+                skipWhitespace()
+                if (i < n && text[i] == ']') {
+                    i++ // empty array
+                } else {
+                    while (true) {
+                        skipValue()
+                        skipWhitespace()
+                        if (i < n && text[i] == ',') {
+                            i++
+                            skipWhitespace()
+                            if (i < n && text[i] == ']') {
+                                throw IllegalArgumentException("trailing comma before ']' in nested array")
+                            }
+                        } else if (i < n && text[i] == ']') {
+                            i++
+                            break
+                        } else {
+                            throw IllegalArgumentException("expected ',' or ']' in nested array")
+                        }
+                    }
+                }
+            }
+
+            't' -> {
+                if (text.startsWith("true", i)) {
+                    i += 4
+                } else {
+                    throw IllegalArgumentException("invalid literal starting with 't'")
+                }
+            }
+
+            'f' -> {
+                if (text.startsWith("false", i)) {
+                    i += 5
+                } else {
+                    throw IllegalArgumentException("invalid literal starting with 'f'")
+                }
+            }
+
+            'n' -> {
+                if (text.startsWith("null", i)) {
+                    i += 4
+                } else {
+                    throw IllegalArgumentException("invalid literal starting with 'n'")
+                }
+            }
+
+            '-', in '0'..'9' -> {
+                parseNumber()
+            }
+
+            else -> {
+                throw IllegalArgumentException("unexpected character while parsing value: ${text[i]}")
             }
         }
     }
 
     try {
         skipWhitespace()
+        if (i >= n || text[i] != '{') {
+            return Result.failure(
+                InvalidJsonCredentials.JsonError(
+                    Exception("expected a JSON document starting with `{`"),
+                ),
+            )
+        }
+        i++ // consume '{'
+        skipWhitespace()
         if (i < n && text[i] == '}') {
             i++ // empty object
         } else {
-            while (i < n) {
+            while (true) {
                 skipWhitespace()
                 if (i >= n) {
                     return Result.failure(
                         InvalidJsonCredentials.JsonError(Exception("unexpected end of JSON object")),
                     )
-                }
-                if (text[i] == '}') {
-                    i++
-                    break
                 }
                 if (text[i] != '"') {
                     return Result.failure(
@@ -412,38 +566,54 @@ internal fun jsonParseLoop(
                             Token.StartArray
                         }
 
-                        't', 'f' -> {
-                            val isTrue = text.startsWith("true", i)
-                            val isFalse = text.startsWith("false", i)
-                            if (!isTrue && !isFalse) throw IllegalArgumentException("invalid boolean")
-                            Token.ValueBool(isTrue)
+                        't' -> {
+                            if (!text.startsWith("true", i)) throw IllegalArgumentException("invalid boolean")
+                            i += 4
+                            Token.ValueBool(true)
+                        }
+
+                        'f' -> {
+                            if (!text.startsWith("false", i)) throw IllegalArgumentException("invalid boolean")
+                            i += 5
+                            Token.ValueBool(false)
                         }
 
                         'n' -> {
                             if (!text.startsWith("null", i)) throw IllegalArgumentException("invalid null")
+                            i += 4
                             Token.ValueNull
                         }
 
+                        '-', in '0'..'9' -> {
+                            val numStr = parseNumber()
+                            Token.ValueNumber(numStr)
+                        }
+
                         else -> {
-                            val sb = StringBuilder()
-                            var j = i
-                            while (j < n && (text[j].isDigit() || text[j] == '.' || text[j] == '-' || text[j] == '+' || text[j] == 'e' || text[j] == 'E')) {
-                                sb.append(text[j++])
-                            }
-                            Token.ValueNumber(sb.toString())
+                            throw IllegalArgumentException("unexpected character starting value: ${text[i]}")
                         }
                     }
                 val callbackRes = f(key, token)
                 if (callbackRes.isFailure) {
                     return callbackRes
                 }
-                if (token !is Token.ValueString) {
+                if (token is Token.StartObject || token is Token.StartArray) {
                     skipValue()
                 }
                 skipWhitespace()
                 if (i < n && text[i] == ',') {
                     i++ // consume ','
                     skipWhitespace()
+                    if (i < n && text[i] == '}') {
+                        return Result.failure(
+                            InvalidJsonCredentials.JsonError(Exception("trailing comma before '}'")),
+                        )
+                    }
+                    if (i >= n) {
+                        return Result.failure(
+                            InvalidJsonCredentials.JsonError(Exception("unexpected end of JSON after ','")),
+                        )
+                    }
                 } else if (i < n && text[i] == '}') {
                     i++ // consume '}'
                     break
